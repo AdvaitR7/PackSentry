@@ -274,7 +274,7 @@ class _ScanScreenState extends State<ScanScreen> {
                           context,
                           MaterialPageRoute(
                             builder: (context) =>
-                                const ProcessingScreen(),
+                                ProcessingScreen(frontImage: frontImage!, backImage: backImage, sideImage: sideImage,),
                           ),
                         );
                       }
