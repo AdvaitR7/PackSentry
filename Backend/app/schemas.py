@@ -1,6 +1,10 @@
 from pydantic import BaseModel
+from fastapi import UploadFile
 
-class ScanSession(BaseModel):
-    scan_id : str
-    capture_time : str
-    scan_mode : str
+class Image():
+    
+    def __init__(self, front, back, side):
+        self.front = front
+        self.back = back
+        self.side = side
+           

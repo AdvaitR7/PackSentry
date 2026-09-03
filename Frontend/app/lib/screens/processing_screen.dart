@@ -38,6 +38,7 @@ class _ProcessingScreenState extends State<ProcessingScreen> {
         backImage: widget.backImage,
         sideImage: widget.sideImage,
       );
+      debugPrint('Analysis API Response: $result');
 
       if (!mounted) return;
 
@@ -87,10 +88,63 @@ class _ProcessingScreenState extends State<ProcessingScreen> {
       );
     }
 
-    // Default loading layout with progress indicator...
     return Scaffold(
       appBar: AppBar(title: const Text('Analyzing Product'), centerTitle: true),
-      body: const Center(child: CircularProgressIndicator()),
+      body: Center(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const CircularProgressIndicator(),
+              const SizedBox(height: 30),
+              const Text(
+                'Analyzing Product',
+                style: TextStyle(
+                  fontSize: 26,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              const SizedBox(height: 12),
+              const Text(
+                'Please wait while we check the package for Legal Metrology compliance.',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 16,
+                  color: Colors.grey,
+                ),
+              ),
+              const SizedBox(height: 40),
+              _buildStep(Icons.check_circle, 'Images captured', isDone: true),
+              _buildStep(Icons.sync, 'Reading package information', isDone: true),
+              _buildStep(Icons.text_fields, 'Extracting declarations', isDone: true),
+              _buildStep(Icons.rule, 'Checking legal rules', isDone: false),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildStep(IconData icon, String text, {required bool isDone}) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8),
+      child: Row(
+        children: [
+          Icon(
+            icon,
+            color: isDone ? Colors.blue : Colors.grey,
+          ),
+          const SizedBox(width: 12),
+          Text(
+            text,
+            style: TextStyle(
+              fontSize: 16,
+              color: isDone ? Colors.black87 : Colors.grey,
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

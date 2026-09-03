@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'camera_screen.dart';
 import 'processing_screen.dart';
 
@@ -14,6 +15,49 @@ class _ScanScreenState extends State<ScanScreen> {
   File? frontImage;
   File? backImage;
   File? sideImage;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadSampleImages();
+  }
+
+  Future<File> _getImageFile(String assetPath, String localPath) async {
+    final localFile = File(localPath);
+    if (await localFile.exists()) {
+      return localFile;
+    }
+    // Fallback for Android/iOS: extract bundled asset to temp directory
+    final byteData = await rootBundle.load(assetPath);
+    final fileName = assetPath.split('/').last;
+    final tempFile = File('${Directory.systemTemp.path}/$fileName');
+    await tempFile.writeAsBytes(
+      byteData.buffer.asUint8List(
+        byteData.offsetInBytes,
+        byteData.lengthInBytes,
+      ),
+    );
+    return tempFile;
+  }
+
+  Future<void> _loadSampleImages() async {
+    const localDir = r'C:\Users\Abhigyan\Documents\Superfolder\Study\MIT\SIH\SIH26\Code\Images';
+    try {
+      final front = await _getImageFile('assets/images/front.png', '$localDir\\front.png');
+      final back = await _getImageFile('assets/images/back.png', '$localDir\\back.png');
+      final side = await _getImageFile('assets/images/side.png', '$localDir\\side.png');
+
+      if (mounted) {
+        setState(() {
+          frontImage = front;
+          backImage = back;
+          sideImage = side;
+        });
+      }
+    } catch (e) {
+      debugPrint('Could not preload sample images: $e');
+    }
+  }
 
   Future<void> captureImage(String side) async {
     final imagePath = await Navigator.push(
@@ -182,6 +226,13 @@ class _ScanScreenState extends State<ScanScreen> {
       appBar: AppBar(
         title: const Text('Scan Product'),
         centerTitle: true,
+        actions: [
+          IconButton(
+            tooltip: 'Load Sample Images',
+            icon: const Icon(Icons.refresh),
+            onPressed: _loadSampleImages,
+          ),
+        ],
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
