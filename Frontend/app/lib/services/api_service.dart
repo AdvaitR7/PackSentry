@@ -1,10 +1,13 @@
-import 'dart:io';
 import 'dart:convert';
-
+import 'dart:io';
+import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 
 class ApiService {
   static String get baseUrl {
+    if (kIsWeb) {
+      return 'http://127.0.0.1:8000';
+    }
     if (Platform.isAndroid) {
       return 'http://10.0.2.2:8000';
     }
@@ -12,27 +15,43 @@ class ApiService {
   }
 
   Future<Map<String, dynamic>> analyzeImages({
-    required File frontImage,
-    File? backImage,
-    File? sideImage,
+    required Uint8List frontBytes,
+    String frontName = 'front.png',
+    Uint8List? backBytes,
+    String backName = 'back.png',
+    Uint8List? sideBytes,
+    String sideName = 'side.png',
   }) async {
     final uri = Uri.parse('$baseUrl/api/analyze');
     final request = http.MultipartRequest('POST', uri);
-    // Add front image (mandatory)
+
     request.files.add(
-      await http.MultipartFile.fromPath('front_image', frontImage.path),
+      http.MultipartFile.fromBytes(
+        'front_image',
+        frontBytes,
+        filename: frontName,
+      ),
     );
-    // Add optional back and side images if present
-    if (backImage != null) {
+
+    if (backBytes != null) {
       request.files.add(
-        await http.MultipartFile.fromPath('back_image', backImage.path),
+        http.MultipartFile.fromBytes(
+          'back_image',
+          backBytes,
+          filename: backName,
+        ),
       );
     }
-    if (sideImage != null) {
+    if (sideBytes != null) {
       request.files.add(
-        await http.MultipartFile.fromPath('side_image', sideImage.path),
+        http.MultipartFile.fromBytes(
+          'side_image',
+          sideBytes,
+          filename: sideName,
+        ),
       );
     }
+
     final streamedResponse = await request.send();
     final response = await http.Response.fromStream(streamedResponse);
     if (response.statusCode == 200) {

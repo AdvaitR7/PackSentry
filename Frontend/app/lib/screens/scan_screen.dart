@@ -12,9 +12,9 @@ class ScanScreen extends StatefulWidget {
 }
 
 class _ScanScreenState extends State<ScanScreen> {
-  File? frontImage;
-  File? backImage;
-  File? sideImage;
+  Uint8List? frontBytes;
+  Uint8List? backBytes;
+  Uint8List? sideBytes;
 
   @override
   void initState() {
@@ -22,36 +22,17 @@ class _ScanScreenState extends State<ScanScreen> {
     _loadSampleImages();
   }
 
-  Future<File> _getImageFile(String assetPath, String localPath) async {
-    final localFile = File(localPath);
-    if (await localFile.exists()) {
-      return localFile;
-    }
-    // Fallback for Android/iOS: extract bundled asset to temp directory
-    final byteData = await rootBundle.load(assetPath);
-    final fileName = assetPath.split('/').last;
-    final tempFile = File('${Directory.systemTemp.path}/$fileName');
-    await tempFile.writeAsBytes(
-      byteData.buffer.asUint8List(
-        byteData.offsetInBytes,
-        byteData.lengthInBytes,
-      ),
-    );
-    return tempFile;
-  }
-
   Future<void> _loadSampleImages() async {
-    const localDir = r'C:\Users\Abhigyan\Documents\Superfolder\Study\MIT\SIH\SIH26\Code\Images';
     try {
-      final front = await _getImageFile('assets/images/front.png', '$localDir\\front.png');
-      final back = await _getImageFile('assets/images/back.png', '$localDir\\back.png');
-      final side = await _getImageFile('assets/images/side.png', '$localDir\\side.png');
+      final frontData = await rootBundle.load('assets/images/front.png');
+      final backData = await rootBundle.load('assets/images/back.png');
+      final sideData = await rootBundle.load('assets/images/side.png');
 
       if (mounted) {
         setState(() {
-          frontImage = front;
-          backImage = back;
-          sideImage = side;
+          frontBytes = frontData.buffer.asUint8List();
+          backBytes = backData.buffer.asUint8List();
+          sideBytes = sideData.buffer.asUint8List();
         });
       }
     } catch (e) {
@@ -69,13 +50,15 @@ class _ScanScreenState extends State<ScanScreen> {
 
     if (imagePath == null) return;
 
+    final bytes = await File(imagePath).readAsBytes();
+
     setState(() {
       if (side == 'front') {
-        frontImage = File(imagePath);
+        frontBytes = bytes;
       } else if (side == 'back') {
-        backImage = File(imagePath);
+        backBytes = bytes;
       } else if (side == 'side') {
-        sideImage = File(imagePath);
+        sideBytes = bytes;
       }
     });
   }
@@ -83,11 +66,11 @@ class _ScanScreenState extends State<ScanScreen> {
   void removeImage(String side) {
     setState(() {
       if (side == 'front') {
-        frontImage = null;
+        frontBytes = null;
       } else if (side == 'back') {
-        backImage = null;
+        backBytes = null;
       } else if (side == 'side') {
-        sideImage = null;
+        sideBytes = null;
       }
     });
   }
@@ -95,11 +78,11 @@ class _ScanScreenState extends State<ScanScreen> {
   Widget imageSection({
     required String title,
     required String description,
-    required File? image,
+    required Uint8List? imageBytes,
     required VoidCallback onTap,
     required String side,
   }) {
-    final isCaptured = image != null;
+    final isCaptured = imageBytes != null;
 
     return Card(
       margin: const EdgeInsets.only(bottom: 16),
@@ -168,8 +151,8 @@ class _ScanScreenState extends State<ScanScreen> {
                 child: isCaptured
                     ? ClipRRect(
                         borderRadius: BorderRadius.circular(11),
-                        child: Image.file(
-                          image,
+                        child: Image.memory(
+                          imageBytes,
                           width: double.infinity,
                           fit: BoxFit.cover,
                         ),
@@ -215,12 +198,12 @@ class _ScanScreenState extends State<ScanScreen> {
   @override
   Widget build(BuildContext context) {
     final capturedCount = [
-      frontImage,
-      backImage,
-      sideImage,
+      frontBytes,
+      backBytes,
+      sideBytes,
     ].where((image) => image != null).length;
 
-    final canAnalyze = frontImage != null;
+    final canAnalyze = frontBytes != null;
 
     return Scaffold(
       appBar: AppBar(
@@ -292,7 +275,7 @@ class _ScanScreenState extends State<ScanScreen> {
             imageSection(
               title: 'Front',
               description: 'Capture the front label of the package.',
-              image: frontImage,
+              imageBytes: frontBytes,
               side: 'front',
               onTap: () => captureImage('front'),
             ),
@@ -300,7 +283,7 @@ class _ScanScreenState extends State<ScanScreen> {
             imageSection(
               title: 'Back',
               description: 'Capture declarations on the back.',
-              image: backImage,
+              imageBytes: backBytes,
               side: 'back',
               onTap: () => captureImage('back'),
             ),
@@ -308,7 +291,7 @@ class _ScanScreenState extends State<ScanScreen> {
             imageSection(
               title: 'Side',
               description: 'Capture additional information on the side.',
-              image: sideImage,
+              imageBytes: sideBytes,
               side: 'side',
               onTap: () => captureImage('side'),
             ),
@@ -324,8 +307,11 @@ class _ScanScreenState extends State<ScanScreen> {
                         Navigator.push(
                           context,
                           MaterialPageRoute(
-                            builder: (context) =>
-                                ProcessingScreen(frontImage: frontImage!, backImage: backImage, sideImage: sideImage,),
+                            builder: (context) => ProcessingScreen(
+                              frontBytes: frontBytes!,
+                              backBytes: backBytes,
+                              sideBytes: sideBytes,
+                            ),
                           ),
                         );
                       }

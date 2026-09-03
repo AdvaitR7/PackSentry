@@ -1,20 +1,19 @@
-import 'dart:io';
-
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import '../services/api_service.dart';
 import 'result_screen.dart';
 
 class ProcessingScreen extends StatefulWidget {
-  final File frontImage;
-  final File? backImage;
-  final File? sideImage;
+  final Uint8List frontBytes;
+  final Uint8List? backBytes;
+  final Uint8List? sideBytes;
 
   const ProcessingScreen({
     super.key,
-    required this.frontImage,
-    this.backImage,
-    this.sideImage,
+    required this.frontBytes,
+    this.backBytes,
+    this.sideBytes,
   });
 
   @override
@@ -34,9 +33,9 @@ class _ProcessingScreenState extends State<ProcessingScreen> {
   Future<void> _startAnalysis() async {
     try {
       final result = await _apiService.analyzeImages(
-        frontImage: widget.frontImage,
-        backImage: widget.backImage,
-        sideImage: widget.sideImage,
+        frontBytes: widget.frontBytes,
+        backBytes: widget.backBytes,
+        sideBytes: widget.sideBytes,
       );
       debugPrint('Analysis API Response: $result');
 
