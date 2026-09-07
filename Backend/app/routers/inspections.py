@@ -298,15 +298,63 @@ async def get_inspection(inspection_id: str, request: Request):
 
 @router.get("")
 async def list_inspections(
+    request: Request,
     limit: int = Query(default=20, ge=1, le=100),
     cursor: Optional[datetime] = Query(default=None),
     status: Optional[str] = Query(default=None),
 ):
-    """Cursor-paginated inspection history."""
+    """
+    Cursor-paginated inspection history.
+
+    Falls back to the in-memory worker registry when Postgres is not configured
+    (offline demo mode) so this session's inspections are still listed.
+    """
     async with acquire_connection() as conn:
-        return await inspection_repo.list_inspections(
+        rows = await inspection_repo.list_inspections(
             conn=conn,
             limit=limit,
             cursor_created_at=cursor,
             status_filter=status,
         )
+
+    if rows:
+        return rows
+
+    worker = getattr(request.app.state, "worker", None)
+    if worker is None:
+        return []
+
+    return _list_inspections_from_registry(worker, limit=limit, status_filter=status)
+
+
+def _list_inspections_from_registry(worker, limit: int, status_filter: Optional[str]) -> List[Dict[str, Any]]:
+    """Renders in-memory job states in the same shape as the Postgres history rows."""
+    jobs = sorted(
+        worker.registry.snapshot(),
+        key=lambda job: job.created_at,
+        reverse=True,
+    )
+
+    results: List[Dict[str, Any]] = []
+    for job in jobs:
+        status_val = job.status.value
+        if status_filter and status_val != status_filter:
+            continue
+
+        result = job.result
+        results.append(
+            {
+                "id": job.inspection_id,
+                "status": status_val,
+                "overall": result.overall.value if result else None,
+                "overall_ui_bucket": result.overall_ui_bucket.value if result else None,
+                "summary": result.summary.model_dump() if result else None,
+                "context": result.context.model_dump() if result else None,
+                "created_at": job.created_at,
+                "completed_at": result.completed_at if result else None,
+            }
+        )
+        if len(results) >= limit:
+            break
+
+    return results

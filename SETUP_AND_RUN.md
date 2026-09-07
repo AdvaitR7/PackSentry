@@ -123,6 +123,8 @@ OLLAMA_HOST=http://localhost:11434
 
 ### Method A: Using the Launcher Script (Linux / macOS)
 
+The launcher automatically detects and uses the `.venv` Python environment:
+
 ```bash
 cd Backend
 bash run_backend.sh
@@ -132,8 +134,9 @@ bash run_backend.sh
 
 ```bash
 cd Backend
+source .venv/bin/activate
 export PYTHONPATH="..:.:$PYTHONPATH"
-python3 -m uvicorn app.main:app --host 127.0.0.1 --port 8000 --reload
+python -m uvicorn app.main:app --host 127.0.0.1 --port 8000 --reload
 ```
 
 ### Verification:
@@ -168,8 +171,10 @@ flutter pub get
 
 To prevent security vulnerabilities on public or venue Wi-Fi, the backend listens strictly on loopback (`127.0.0.1`). Connect your test device using one of the following methods:
 
+On the first API call the app probes its candidate hosts (`http://10.0.2.2:8000`, then `http://127.0.0.1:8000`) against `/healthz` and pins whichever answers, so the same build works on an emulator and on a USB-attached phone without editing anything.
+
 #### Option 1: Android Emulator (Recommended)
-The Flutter app automatically detects when it is running on an Android emulator and routes API requests to `http://10.0.2.2:8000` (the host loopback bridge). No extra configuration is needed.
+The emulator reaches the host loopback via `http://10.0.2.2:8000`. No extra configuration is needed.
 
 #### Option 2: Physical Android Device (over USB)
 1. Enable **Developer Options** and **USB Debugging** on your phone.
@@ -185,7 +190,9 @@ The Flutter app automatically detects when it is running on an Android emulator 
    *Now, requests from your phone to `http://127.0.0.1:8000` automatically route directly to your host backend!*
 
 #### Option 3: Manual Backend URL Setting in App
-In the Flutter app, navigate to the **Settings** tab. You can test and override the backend URL directly at runtime.
+In the Flutter app, navigate to the **Settings** tab. Use **Auto-Detect**, the **USB / Local** and **Emulator** presets, or type any base URL and press **Save**. The `/healthz` panel below shows whether the chosen host actually answers.
+
+> **Note:** `android:usesCleartextTraffic="true"` is set in `Frontend/app/android/app/src/main/AndroidManifest.xml`. Android 9+ blocks plain HTTP without it, which surfaces in the app as `Failed to load history/rules … Cleartext HTTP traffic not permitted`.
 
 ### Step 5.3: Run the App
 

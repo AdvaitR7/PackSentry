@@ -293,6 +293,40 @@ def test_polling_non_existent_returns_404(client):
     assert response.status_code == 404
 
 
+def test_history_falls_back_to_registry_when_db_offline(client):
+    """
+    GET /v1/inspections lists in-memory jobs when Postgres is not configured,
+    so the History screen is not empty in offline demo mode.
+    """
+    worker = app.state.worker
+    test_id = "insp_history_fallback_001"
+    asyncio.run(worker.registry.register(test_id, InspectionStatus.EVALUATING))
+
+    response = client.get("/v1/inspections?limit=50")
+    assert response.status_code == 200
+
+    rows = response.json()
+    assert isinstance(rows, list)
+    entry = next((r for r in rows if r["id"] == test_id), None)
+    assert entry is not None, "In-flight job missing from offline history listing"
+    assert entry["status"] == "EVALUATING"
+    assert entry["created_at"] is not None
+
+
+def test_history_registry_fallback_respects_status_filter(client):
+    """The offline history fallback honours the status query filter."""
+    worker = app.state.worker
+    asyncio.run(worker.registry.register("insp_filter_queued_001", InspectionStatus.QUEUED))
+    asyncio.run(worker.registry.register("insp_filter_ocr_001", InspectionStatus.OCR))
+
+    response = client.get("/v1/inspections?status=OCR&limit=50")
+    assert response.status_code == 200
+
+    rows = response.json()
+    assert all(r["status"] == "OCR" for r in rows)
+    assert any(r["id"] == "insp_filter_ocr_001" for r in rows)
+
+
 @pytest.mark.asyncio
 async def test_worker_end_to_end_pipeline_execution():
     """

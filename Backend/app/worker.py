@@ -112,6 +112,10 @@ class InFlightJobRegistry:
         """Synchronous read for ultra-low-latency (<1ms) API handlers."""
         return self._jobs.get(inspection_id)
 
+    def snapshot(self) -> List[JobState]:
+        """Returns a snapshot of in-memory jobs for offline history listing."""
+        return list(self._jobs.values())
+
 
 class InspectionWorker:
     """Bounded single-capacity background execution worker."""

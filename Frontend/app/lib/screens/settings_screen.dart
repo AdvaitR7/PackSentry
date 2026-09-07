@@ -28,17 +28,18 @@ class _SettingsScreenState extends State<SettingsScreen> {
     super.dispose();
   }
 
-  Future<void> _checkHealth() async {
+  Future<void> _checkHealth({bool autoDetect = false}) async {
     setState(() {
       _isLoadingHealth = true;
       _healthError = null;
     });
 
     try {
-      final health = await _apiService.getHealthz();
+      final health = await _apiService.getHealthz(forceResolve: autoDetect);
       if (!mounted) return;
       setState(() {
         _healthData = health;
+        _urlController.text = ApiService.baseUrl;
         _isLoadingHealth = false;
       });
     } catch (e) {
@@ -137,7 +138,37 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 ),
               ],
             ),
-            const SizedBox(height: 24),
+            const SizedBox(height: 10),
+            Wrap(
+              spacing: 8,
+              runSpacing: 4,
+              children: [
+                ActionChip(
+                  avatar: const Icon(Icons.auto_mode, size: 16),
+                  label: const Text('Auto-Detect'),
+                  onPressed: () => _checkHealth(autoDetect: true),
+                ),
+                ActionChip(
+                  avatar: const Icon(Icons.usb, size: 16),
+                  label: const Text('USB / Local (127.0.0.1)'),
+                  onPressed: () {
+                    _urlController.text = 'http://127.0.0.1:8000';
+                    ApiService.customBaseUrl = 'http://127.0.0.1:8000';
+                    _checkHealth();
+                  },
+                ),
+                ActionChip(
+                  avatar: const Icon(Icons.phone_android, size: 16),
+                  label: const Text('Emulator (10.0.2.2)'),
+                  onPressed: () {
+                    _urlController.text = 'http://10.0.2.2:8000';
+                    ApiService.customBaseUrl = 'http://10.0.2.2:8000';
+                    _checkHealth();
+                  },
+                ),
+              ],
+            ),
+            const SizedBox(height: 20),
 
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
