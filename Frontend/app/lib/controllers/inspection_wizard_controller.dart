@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
+
 import '../models/models.dart';
 
 class InspectionWizardController extends ChangeNotifier {
@@ -120,6 +121,7 @@ class InspectionWizardController extends ChangeNotifier {
       commodityCategory: _commodityCategory,
       importStatus: _importStatus,
       fourthScheduleKey: _fourthScheduleKey,
+      packageCapacityLe5Cm3: false,
       allPanelsCaptured: _allPanelsCaptured,
       inspectorId: _inspectorId,
       capturedAt: DateTime.now(),

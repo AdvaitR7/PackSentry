@@ -49,35 +49,44 @@ void main() {
     expect(find.text('Retake Photo'), findsOneWidget);
   });
 
-  testWidgets('Review & Submit unlocks only once PDP and BACK are captured',
-      (tester) async {
+  testWidgets('Review & Submit unlocks only once PDP and BACK are captured', (
+    tester,
+  ) async {
     final controller = InspectionWizardController();
 
     await tester.pumpWidget(_wrap(controller));
     await tester.pumpAndSettle();
 
     ElevatedButton reviewButton() => tester.widget<ElevatedButton>(
-          find.widgetWithText(ElevatedButton, 'Review & Submit Inspection'),
-        );
+      find.widgetWithText(ElevatedButton, 'Review & Submit Inspection'),
+    );
 
     expect(reviewButton().onPressed, isNull);
-    expect(find.text('Capture both PDP and Back panel images to continue.'),
-        findsOneWidget);
+    expect(
+      find.text('Capture both PDP and Back panel images to continue.'),
+      findsOneWidget,
+    );
 
     controller.setPdpBytes(_tinyPng);
     await tester.pumpAndSettle();
-    expect(reviewButton().onPressed, isNull,
-        reason: 'BACK panel is still missing');
+    expect(
+      reviewButton().onPressed,
+      isNull,
+      reason: 'BACK panel is still missing',
+    );
 
     controller.setBackBytes(_tinyPng);
     await tester.pumpAndSettle();
     expect(reviewButton().onPressed, isNotNull);
-    expect(find.text('Capture both PDP and Back panel images to continue.'),
-        findsNothing);
+    expect(
+      find.text('Capture both PDP and Back panel images to continue.'),
+      findsNothing,
+    );
   });
 
-  testWidgets('Removing a captured panel returns the card to its empty state',
-      (tester) async {
+  testWidgets('Removing a captured panel returns the card to its empty state', (
+    tester,
+  ) async {
     final controller = InspectionWizardController();
     controller.setPdpBytes(_tinyPng);
 
@@ -90,6 +99,13 @@ void main() {
 
     expect(controller.pdpBytes, isNull);
     expect(find.text('Tap to photograph panel'), findsNWidgets(3));
+  });
+
+  test('Built capture context sends required boolean fields, not null', () {
+    final context = InspectionWizardController().buildCaptureContext().toJson();
+
+    expect(context['package_capacity_le_5cm3'], isFalse);
+    expect(context['all_panels_captured'], isTrue);
   });
 
   test('Base URL candidates cover emulator and USB-reverse loopback', () {
