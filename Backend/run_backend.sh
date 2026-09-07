@@ -1,7 +1,8 @@
 #!/bin/bash
-cd "$(dirname "$0")/app" || exit 1
+cd "$(dirname "$0")" || exit 1
 echo "========================================================"
-echo "Starting PackSentry Backend Server..."
-echo "OpenCV windows will pop up on your desktop!"
+echo "Starting PackSentry Legal Metrology Backend Server..."
+echo "API live on http://127.0.0.1:8000 (docs: /docs, health: /healthz)"
 echo "========================================================"
-python3 -m uvicorn main:app --port 8000 --reload
+export PYTHONPATH="..:.:$PYTHONPATH"
+exec python3 -m uvicorn app.main:app --host 127.0.0.1 --port 8000 --reload
