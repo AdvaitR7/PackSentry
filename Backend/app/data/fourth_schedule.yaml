@@ -1,0 +1,71 @@
+# Fourth Schedule to Legal Metrology (Packaged Commodities) Rules, 2011
+# Statutory exception table to Rule 12(2) general quantity bases.
+# Permitted bases: MASS, VOLUME, LENGTH, AREA, NUMBER
+#
+# VERIFICATION STATUS: The Fourth Schedule has 26 rows in the gazetted text.
+# Only the 8 rows below are confirmed against a primary/secondary source cited
+# in .sensitive-docs/07 - Rule 12 and Schedule 4 Explanation.md. The remaining
+# 18 rows are NOT included here -- do not fabricate them. Before demo day,
+# transcribe the remaining rows directly from the gazette PDF (see source_url
+# in Backend/app/rules/citations.py for RULE_12_BASE) and extend this file.
+# An unmapped commodity_category simply falls through to Rule 12(2)'s normal
+# mass/length/area/volume/number mapping, which is a safe default.
+
+version: "2026.09.01-partial"
+verified_row_count: 8
+statutory_row_count: 26
+
+commodities:
+  AEROSOL_PRODUCTS:
+    name: "Aerosol products"
+    permitted_bases:
+      - MASS
+    notes: "Must be declared by weight (mass), not by liquid volume, notwithstanding that the contents are typically dispensed as a spray."
+
+  ACIDS_IN_LIQUID_FORM:
+    name: "Acids in liquid form"
+    permitted_bases:
+      - MASS
+      - VOLUME
+    notes: "Permitted by weight or volume."
+
+  COMPRESSED_LIQUEFIED_GAS:
+    name: "Compressed or liquefied gas (excluding LPG)"
+    permitted_bases:
+      - MASS
+    supplementary_required: "Equivalent volume at stated temperature and pressure must also be declared."
+    notes: "LPG is specifically excluded from this entry."
+
+  CURD:
+    name: "Curd"
+    permitted_bases:
+      - MASS
+    notes: "Must be declared by weight (mass)."
+
+  ELECTRIC_CABLES:
+    name: "Electric cables"
+    permitted_bases:
+      - LENGTH
+      - MASS
+    notes: "Permitted by length or weight."
+
+  ELECTRIC_WIRE:
+    name: "Electric wire"
+    permitted_bases:
+      - LENGTH
+      - MASS
+    notes: "Permitted by length or weight."
+
+  FENCING_WIRE:
+    name: "Fencing wire"
+    permitted_bases:
+      - NUMBER
+      - MASS
+    notes: "Permitted by number or weight."
+
+  FRUITS:
+    name: "Fruits"
+    permitted_bases:
+      - NUMBER
+      - MASS
+    notes: "Permitted by number or weight."

@@ -1,0 +1,100 @@
+{
+  "ocr_engine": "paddleocr",
+  "ocr_version": "2.8.0",
+  "images": [
+    {
+      "image_id": "img_missing_mrp_pdp",
+      "role": "PDP",
+      "analysis_width": 1200,
+      "analysis_height": 1600,
+      "original_width": 3024,
+      "original_height": 4032,
+      "transform": {
+        "rotation_deg": 0.0,
+        "scale_x": 0.3968,
+        "scale_y": 0.3968,
+        "offset_x": 0.0,
+        "offset_y": 0.0
+      },
+      "lines": [
+        {
+          "line_id": "img_missing_mrp_pdp:l001",
+          "raw_text": "NATUREPURE ORGANIC HONEY",
+          "confidence": 0.988,
+          "polygon_analysis": [[260, 200], [940, 200], [940, 260], [260, 260]],
+          "polygon_original": [[655, 504], [2369, 504], [2369, 655], [655, 655]],
+          "polygon_normalized": [[0.216, 0.125], [0.783, 0.125], [0.783, 0.162], [0.216, 0.162]],
+          "script": "LATIN",
+          "words": []
+        },
+        {
+          "line_id": "img_missing_mrp_pdp:l002",
+          "raw_text": "Net Quantity: 500 g",
+          "confidence": 0.975,
+          "polygon_analysis": [[380, 820], [820, 820], [820, 870], [380, 870]],
+          "polygon_original": [[957, 2066], [2066, 2066], [2066, 2192], [957, 2192]],
+          "polygon_normalized": [[0.316, 0.512], [0.683, 0.512], [0.683, 0.543], [0.316, 0.543]],
+          "script": "LATIN",
+          "words": []
+        }
+      ]
+    },
+    {
+      "image_id": "img_missing_mrp_back",
+      "role": "BACK",
+      "analysis_width": 1200,
+      "analysis_height": 1600,
+      "original_width": 3024,
+      "original_height": 4032,
+      "transform": {
+        "rotation_deg": 0.0,
+        "scale_x": 0.3968,
+        "scale_y": 0.3968,
+        "offset_x": 0.0,
+        "offset_y": 0.0
+      },
+      "lines": [
+        {
+          "line_id": "img_missing_mrp_back:l001",
+          "raw_text": "PACKED BY: NaturePure Organics, Khasra 345, Dehradun, Uttarakhand 248001",
+          "confidence": 0.942,
+          "polygon_analysis": [[150, 320], [1050, 320], [1050, 390], [150, 390]],
+          "polygon_original": [[378, 806], [2646, 806], [2646, 982], [378, 982]],
+          "polygon_normalized": [[0.125, 0.200], [0.875, 0.200], [0.875, 0.243], [0.125, 0.243]],
+          "script": "LATIN",
+          "words": []
+        },
+        {
+          "line_id": "img_missing_mrp_back:l002",
+          "raw_text": "PKD: 08/2026",
+          "confidence": 0.984,
+          "polygon_analysis": [[150, 420], [420, 420], [420, 470], [150, 470]],
+          "polygon_original": [[378, 1058], [1058, 1058], [1058, 1184], [378, 1184]],
+          "polygon_normalized": [[0.125, 0.262], [0.350, 0.262], [0.350, 0.294], [0.125, 0.294]],
+          "script": "LATIN",
+          "words": []
+        },
+        {
+          "line_id": "img_missing_mrp_back:l003",
+          "raw_text": "Customer Care: care@naturepure.in, Tel: 0135-2765432",
+          "confidence": 0.939,
+          "polygon_analysis": [[150, 500], [800, 500], [800, 550], [150, 550]],
+          "polygon_original": [[378, 1260], [2016, 1260], [2016, 1386], [378, 1386]],
+          "polygon_normalized": [[0.125, 0.312], [0.666, 0.312], [0.666, 0.344], [0.125, 0.344]],
+          "script": "LATIN",
+          "words": []
+        },
+        {
+          "line_id": "img_missing_mrp_back:l004",
+          "raw_text": "Country of Origin: India",
+          "confidence": 0.992,
+          "polygon_analysis": [[150, 580], [550, 580], [550, 620], [150, 620]],
+          "polygon_original": [[378, 1461], [1386, 1461], [1386, 1562], [378, 1562]],
+          "polygon_normalized": [[0.125, 0.362], [0.458, 0.362], [0.458, 0.387], [0.125, 0.387]],
+          "script": "LATIN",
+          "words": []
+        }
+      ]
+    }
+  ]
+}

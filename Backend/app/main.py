@@ -1,16 +1,20 @@
 from fastapi import FastAPI, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
 from typing import Optional
-from schemas import Image
 from preprocessing import ImagePreprocessor
 
 app = FastAPI()
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
+    allow_origins=[
+        "http://localhost",
+        "http://localhost:8080",
+        "http://127.0.0.1",
+        "http://10.0.2.2",
+    ],
+    allow_credentials=False,
+    allow_methods=["GET", "POST", "OPTIONS"],
     allow_headers=["*"],
 )
 
@@ -25,9 +29,14 @@ async def analyze_product(
     back_bytes = await back_image.read() if back_image else None
     side_bytes = await side_image.read() if side_image else None
 
-    image = Image(front_bytes, back_bytes, side_bytes)
-    ImagePreprocessor.show(image)
-    
+    front_img, front_matrix = ImagePreprocessor.process(front_bytes)
+    back_img, back_matrix = (
+        ImagePreprocessor.process(back_bytes) if back_bytes else (None, None)
+    )
+    side_img, side_matrix = (
+        ImagePreprocessor.process(side_bytes) if side_bytes else (None, None)
+    )
+
     # Run compliance / OCR checks here...
     return {
         "status": "compliant",

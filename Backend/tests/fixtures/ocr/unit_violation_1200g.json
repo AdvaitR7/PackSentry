@@ -1,0 +1,115 @@
+{
+  "ocr_engine": "paddleocr",
+  "ocr_version": "2.8.0",
+  "images": [
+    {
+      "image_id": "img_1200g_pdp",
+      "role": "PDP",
+      "analysis_width": 1200,
+      "analysis_height": 1600,
+      "original_width": 3024,
+      "original_height": 4032,
+      "transform": {
+        "rotation_deg": 0.0,
+        "scale_x": 0.3968,
+        "scale_y": 0.3968,
+        "offset_x": 0.0,
+        "offset_y": 0.0
+      },
+      "lines": [
+        {
+          "line_id": "img_1200g_pdp:l001",
+          "raw_text": "CLEANHOME DETERGENT POWDER",
+          "confidence": 0.982,
+          "polygon_analysis": [[250, 220], [950, 220], [950, 280], [250, 280]],
+          "polygon_original": [[630, 554], [2394, 554], [2394, 705], [630, 705]],
+          "polygon_normalized": [[0.208, 0.137], [0.791, 0.137], [0.791, 0.175], [0.208, 0.175]],
+          "script": "LATIN",
+          "words": []
+        },
+        {
+          "line_id": "img_1200g_pdp:l002",
+          "raw_text": "Net Qty.: 1200 g",
+          "confidence": 0.963,
+          "polygon_analysis": [[410, 880], [790, 880], [790, 930], [410, 930]],
+          "polygon_original": [[1033, 2217], [1990, 2217], [1990, 2343], [1033, 2343]],
+          "polygon_normalized": [[0.341, 0.550], [0.658, 0.550], [0.658, 0.581], [0.341, 0.581]],
+          "script": "LATIN",
+          "words": [
+            { "raw_text": "Net", "confidence": 0.98, "polygon_normalized": [[0.341, 0.550], [0.410, 0.550], [0.410, 0.581], [0.341, 0.581]] },
+            { "raw_text": "Qty.:", "confidence": 0.95, "polygon_normalized": [[0.420, 0.550], [0.520, 0.550], [0.520, 0.581], [0.420, 0.581]] },
+            { "raw_text": "1200", "confidence": 0.99, "polygon_normalized": [[0.530, 0.550], [0.610, 0.550], [0.610, 0.581], [0.530, 0.581]] },
+            { "raw_text": "g", "confidence": 0.97, "polygon_normalized": [[0.620, 0.550], [0.658, 0.550], [0.658, 0.581], [0.620, 0.581]] }
+          ]
+        },
+        {
+          "line_id": "img_1200g_pdp:l003",
+          "raw_text": "MRP Rs. 185.00 incl. of all taxes",
+          "confidence": 0.958,
+          "polygon_analysis": [[340, 980], [860, 980], [860, 1030], [340, 1030]],
+          "polygon_original": [[856, 2469], [2167, 2469], [2167, 2595], [856, 2595]],
+          "polygon_normalized": [[0.283, 0.612], [0.716, 0.612], [0.716, 0.643], [0.283, 0.643]],
+          "script": "LATIN",
+          "words": []
+        }
+      ]
+    },
+    {
+      "image_id": "img_1200g_back",
+      "role": "BACK",
+      "analysis_width": 1200,
+      "analysis_height": 1600,
+      "original_width": 3024,
+      "original_height": 4032,
+      "transform": {
+        "rotation_deg": 0.0,
+        "scale_x": 0.3968,
+        "scale_y": 0.3968,
+        "offset_x": 0.0,
+        "offset_y": 0.0
+      },
+      "lines": [
+        {
+          "line_id": "img_1200g_back:l001",
+          "raw_text": "MANUFACTURED BY: CleanHome Chemicals Ltd, 42 Industrial Area, Vapi, Gujarat 396195",
+          "confidence": 0.941,
+          "polygon_analysis": [[150, 350], [1050, 350], [1050, 420], [150, 420]],
+          "polygon_original": [[378, 882], [2646, 882], [2646, 1058], [378, 1058]],
+          "polygon_normalized": [[0.125, 0.218], [0.875, 0.218], [0.875, 0.262], [0.125, 0.262]],
+          "script": "LATIN",
+          "words": []
+        },
+        {
+          "line_id": "img_1200g_back:l002",
+          "raw_text": "MFG: 06/2026",
+          "confidence": 0.985,
+          "polygon_analysis": [[150, 450], [420, 450], [420, 500], [150, 500]],
+          "polygon_original": [[378, 1134], [1058, 1134], [1058, 1260], [378, 1260]],
+          "polygon_normalized": [[0.125, 0.281], [0.350, 0.281], [0.350, 0.312], [0.125, 0.312]],
+          "script": "LATIN",
+          "words": []
+        },
+        {
+          "line_id": "img_1200g_back:l003",
+          "raw_text": "Consumer Care: care@cleanhome.com, Tel: 0260-2451234",
+          "confidence": 0.945,
+          "polygon_analysis": [[150, 530], [800, 530], [800, 580], [150, 580]],
+          "polygon_original": [[378, 1335], [2016, 1335], [2016, 1461], [378, 1461]],
+          "polygon_normalized": [[0.125, 0.331], [0.666, 0.331], [0.666, 0.362], [0.125, 0.362]],
+          "script": "LATIN",
+          "words": []
+        },
+        {
+          "line_id": "img_1200g_back:l004",
+          "raw_text": "Country of Origin: India",
+          "confidence": 0.990,
+          "polygon_analysis": [[150, 610], [550, 610], [550, 650], [150, 650]],
+          "polygon_original": [[378, 1537], [1386, 1537], [1386, 1638], [378, 1638]],
+          "polygon_normalized": [[0.125, 0.381], [0.458, 0.381], [0.458, 0.406], [0.125, 0.406]],
+          "script": "LATIN",
+          "words": []
+        }
+      ]
+    }
+  ]
+}

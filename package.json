@@ -1,0 +1,14 @@
+{
+  "name": "packsentry",
+  "version": "0.1.0",
+  "private": true,
+  "description": "PackSentry — Legal Metrology (Packaged Commodities) Rules, 2011 Compliance Scanner",
+  "scripts": {
+    "schema:export": "PYTHONPATH=. python3 -m lmpc_schema.export",
+    "schema:dart": "quicktype --src lmpc_schema/dist/lmpc_schema.json --src-lang schema --lang dart -o Frontend/app/lib/models/generated/lmpc_models.dart --null-safety",
+    "schema": "npm run schema:export && npm run schema:dart"
+  },
+  "devDependencies": {
+    "quicktype": "^26.0.0"
+  }
+}

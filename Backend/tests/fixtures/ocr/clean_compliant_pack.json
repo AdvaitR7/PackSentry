@@ -1,0 +1,127 @@
+{
+  "ocr_engine": "paddleocr",
+  "ocr_version": "2.8.0",
+  "images": [
+    {
+      "image_id": "img_clean_pdp",
+      "role": "PDP",
+      "analysis_width": 1200,
+      "analysis_height": 1600,
+      "original_width": 3024,
+      "original_height": 4032,
+      "transform": {
+        "rotation_deg": 0.0,
+        "scale_x": 0.3968,
+        "scale_y": 0.3968,
+        "offset_x": 0.0,
+        "offset_y": 0.0
+      },
+      "lines": [
+        {
+          "line_id": "img_clean_pdp:l001",
+          "raw_text": "PREMIUM ASSAM TEA",
+          "confidence": 0.985,
+          "polygon_analysis": [[350, 200], [850, 200], [850, 260], [350, 260]],
+          "polygon_original": [[882, 504], [2142, 504], [2142, 655], [882, 655]],
+          "polygon_normalized": [[0.292, 0.125], [0.708, 0.125], [0.708, 0.162], [0.292, 0.162]],
+          "script": "LATIN",
+          "words": [
+            { "raw_text": "PREMIUM", "confidence": 0.99, "polygon_normalized": [[0.292, 0.125], [0.450, 0.125], [0.450, 0.162], [0.292, 0.162]] },
+            { "raw_text": "ASSAM", "confidence": 0.98, "polygon_normalized": [[0.460, 0.125], [0.580, 0.125], [0.580, 0.162], [0.460, 0.162]] },
+            { "raw_text": "TEA", "confidence": 0.98, "polygon_normalized": [[0.590, 0.125], [0.708, 0.125], [0.708, 0.162], [0.590, 0.162]] }
+          ]
+        },
+        {
+          "line_id": "img_clean_pdp:l002",
+          "raw_text": "Net Quantity: 500 g",
+          "confidence": 0.978,
+          "polygon_analysis": [[380, 800], [820, 800], [820, 850], [380, 850]],
+          "polygon_original": [[957, 2016], [2066, 2016], [2066, 2142], [957, 2142]],
+          "polygon_normalized": [[0.316, 0.500], [0.683, 0.500], [0.683, 0.531], [0.316, 0.531]],
+          "script": "LATIN",
+          "words": [
+            { "raw_text": "Net", "confidence": 0.98, "polygon_normalized": [[0.316, 0.500], [0.390, 0.500], [0.390, 0.531], [0.316, 0.531]] },
+            { "raw_text": "Quantity:", "confidence": 0.97, "polygon_normalized": [[0.400, 0.500], [0.540, 0.500], [0.540, 0.531], [0.400, 0.531]] },
+            { "raw_text": "500", "confidence": 0.99, "polygon_normalized": [[0.550, 0.500], [0.620, 0.500], [0.620, 0.531], [0.550, 0.531]] },
+            { "raw_text": "g", "confidence": 0.98, "polygon_normalized": [[0.630, 0.500], [0.683, 0.500], [0.683, 0.531], [0.630, 0.531]] }
+          ]
+        },
+        {
+          "line_id": "img_clean_pdp:l003",
+          "raw_text": "MRP Rs. 249.00 (inclusive of all taxes)",
+          "confidence": 0.965,
+          "polygon_analysis": [[320, 920], [880, 920], [880, 970], [320, 970]],
+          "polygon_original": [[806, 2318], [2217, 2318], [2217, 2444], [806, 2444]],
+          "polygon_normalized": [[0.266, 0.575], [0.733, 0.575], [0.733, 0.606], [0.266, 0.606]],
+          "script": "LATIN",
+          "words": [
+            { "raw_text": "MRP", "confidence": 0.99, "polygon_normalized": [[0.266, 0.575], [0.330, 0.575], [0.330, 0.606], [0.266, 0.606]] },
+            { "raw_text": "Rs.", "confidence": 0.97, "polygon_normalized": [[0.340, 0.575], [0.400, 0.575], [0.400, 0.606], [0.340, 0.606]] },
+            { "raw_text": "249.00", "confidence": 0.99, "polygon_normalized": [[0.410, 0.575], [0.520, 0.575], [0.520, 0.606], [0.410, 0.606]] },
+            { "raw_text": "(inclusive", "confidence": 0.95, "polygon_normalized": [[0.530, 0.575], [0.650, 0.575], [0.650, 0.606], [0.530, 0.606]] },
+            { "raw_text": "of", "confidence": 0.98, "polygon_normalized": [[0.655, 0.575], [0.685, 0.575], [0.685, 0.606], [0.655, 0.606]] },
+            { "raw_text": "all", "confidence": 0.98, "polygon_normalized": [[0.690, 0.575], [0.720, 0.575], [0.720, 0.606], [0.690, 0.606]] },
+            { "raw_text": "taxes)", "confidence": 0.96, "polygon_normalized": [[0.725, 0.575], [0.733, 0.575], [0.733, 0.606], [0.725, 0.606]] }
+          ]
+        }
+      ]
+    },
+    {
+      "image_id": "img_clean_back",
+      "role": "BACK",
+      "analysis_width": 1200,
+      "analysis_height": 1600,
+      "original_width": 3024,
+      "original_height": 4032,
+      "transform": {
+        "rotation_deg": 0.0,
+        "scale_x": 0.3968,
+        "scale_y": 0.3968,
+        "offset_x": 0.0,
+        "offset_y": 0.0
+      },
+      "lines": [
+        {
+          "line_id": "img_clean_back:l001",
+          "raw_text": "MANUFACTURED BY: Apex Beverages Pvt Ltd, Plot 14, MIDC Bhosari, Pune, Maharashtra 411026",
+          "confidence": 0.952,
+          "polygon_analysis": [[150, 300], [1050, 300], [1050, 380], [150, 380]],
+          "polygon_original": [[378, 756], [2646, 756], [2646, 957], [378, 957]],
+          "polygon_normalized": [[0.125, 0.187], [0.875, 0.187], [0.875, 0.237], [0.125, 0.237]],
+          "script": "LATIN",
+          "words": []
+        },
+        {
+          "line_id": "img_clean_back:l002",
+          "raw_text": "PKD: 07/2026",
+          "confidence": 0.981,
+          "polygon_analysis": [[150, 420], [450, 420], [450, 470], [150, 470]],
+          "polygon_original": [[378, 1058], [1134, 1058], [1134, 1184], [378, 1184]],
+          "polygon_normalized": [[0.125, 0.262], [0.375, 0.262], [0.375, 0.294], [0.125, 0.294]],
+          "script": "LATIN",
+          "words": []
+        },
+        {
+          "line_id": "img_clean_back:l003",
+          "raw_text": "Consumer Care: customercare@apexbev.in, Tel: 1800-200-1234, Apex Beverages, Pune 411026",
+          "confidence": 0.944,
+          "polygon_analysis": [[150, 520], [1050, 520], [1050, 580], [150, 580]],
+          "polygon_original": [[378, 1310], [2646, 1310], [2646, 1461], [378, 1461]],
+          "polygon_normalized": [[0.125, 0.325], [0.875, 0.325], [0.875, 0.362], [0.125, 0.362]],
+          "script": "LATIN",
+          "words": []
+        },
+        {
+          "line_id": "img_clean_back:l004",
+          "raw_text": "Country of Origin: India",
+          "confidence": 0.988,
+          "polygon_analysis": [[150, 620], [550, 620], [550, 660], [150, 660]],
+          "polygon_original": [[378, 1562], [1386, 1562], [1386, 1663], [378, 1663]],
+          "polygon_normalized": [[0.125, 0.387], [0.458, 0.387], [0.458, 0.412], [0.125, 0.412]],
+          "script": "LATIN",
+          "words": []
+        }
+      ]
+    }
+  ]
+}
