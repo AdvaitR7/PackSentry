@@ -1,20 +1,26 @@
 """
 Tests for OCR Engine Protocol, Circuit Breaker, and Automatic Failover (C1, ADR-0004).
 
-Since this sandboxed environment has neither live Google Cloud Vision credentials
-nor an installed PaddleOCR/paddlepaddle build (no cp314 wheels as of 2026-09, see
-plan's Environment & Dependency Risks section), these tests exercise the
-OcrEngine protocol and OcrRouter failover wiring against FAKE engines, proving:
+Since this environment has no live Google Cloud Vision credentials, the failover
+tests exercise the OcrEngine protocol and OcrRouter wiring against FAKE engines,
+proving:
 1. The circuit breaker state machine (CLOSED -> OPEN -> HALF_OPEN -> CLOSED).
 2. That OcrRouter automatically dispatches to the fallback engine on any primary
    failure, without raising, and records which engine actually served the panel.
+
+The final section drives the REAL PaddleOcrAdapter against the installed
+paddleocr build, so upstream API drift fails here rather than at inspection time.
 """
 
+import importlib.util
 import time
+from pathlib import Path
+
 import pytest
 from lmpc_schema import ImageSlot, PanelRole, Transform
 
 from app.ocr.cloud_vision import CircuitBreaker, CircuitState
+from app.ocr.paddleocr_engine import PaddleOcrAdapter
 from app.ocr.protocol import OcrEngineError
 from app.ocr.router import OcrRouter
 
@@ -164,6 +170,56 @@ async def test_router_uses_primary_when_healthy():
         transform=Transform(),
     )
     assert engine_used == "fake_success_engine"
+
+
+# ---------- Real PaddleOCR Adapter Contract (no mocks) ----------
+#
+# The failover tests above deliberately use fakes to isolate the router's wiring,
+# which means the real adapter's constructor, inference call, and result parsing
+# have no coverage at all. These tests drive the installed paddleocr build
+# directly so a breaking upstream API change fails here instead of at inspection
+# time in the app.
+
+paddleocr_required = pytest.mark.skipif(
+    importlib.util.find_spec("paddleocr") is None,
+    reason="paddleocr is not installed in this environment",
+)
+
+SAMPLE_PANEL = Path(__file__).resolve().parents[2] / "Frontend/app/assets/images/front.png"
+
+
+@paddleocr_required
+def test_paddle_adapter_builds_cpu_instance_with_supported_kwargs():
+    """The CPU constructor kwargs must be accepted by the installed paddleocr."""
+    PaddleOcrAdapter(lang="en", use_gpu=False)._build_instance(use_gpu=False)
+
+
+@paddleocr_required
+@pytest.mark.skipif(not SAMPLE_PANEL.exists(), reason="sample panel fixture missing")
+@pytest.mark.asyncio
+async def test_paddle_adapter_recognizes_a_real_panel_on_cpu():
+    """
+    Full adapter path on real image bytes: constructor -> inference -> parsing.
+    Asserts real text came back, so a silently-empty parse cannot pass.
+    """
+    adapter = PaddleOcrAdapter(lang="en", use_gpu=False)
+    slot = await adapter.recognize_panel(
+        analysis_bytes=SAMPLE_PANEL.read_bytes(),
+        role=PanelRole.PDP,
+        image_id="img_real_pdp",
+        analysis_width=1200,
+        analysis_height=1600,
+        original_width=1200,
+        original_height=1600,
+        transform=Transform(),
+    )
+
+    assert slot.image_id == "img_real_pdp"
+    assert slot.lines, "PaddleOCR returned no lines for a text-bearing panel"
+    assert any(line.raw_text.strip() for line in slot.lines)
+    for line in slot.lines:
+        assert 0.0 <= line.confidence <= 1.0
+        assert len(line.polygon_analysis) == 4
 
 
 @pytest.mark.asyncio
