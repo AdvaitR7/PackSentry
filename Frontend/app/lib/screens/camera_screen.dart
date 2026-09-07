@@ -1,4 +1,3 @@
-import 'review_screen.dart';
 import 'package:camera/camera.dart';
 import 'package:flutter/material.dart';
 
@@ -51,18 +50,7 @@ class _CameraScreenState extends State<CameraScreen> {
 
     if (!mounted) return;
 
-final result = await Navigator.push(
-  context,
-  MaterialPageRoute(
-    builder: (context) => ReviewScreen(
-      imagePath: image.path,
-    ),
-  ),
-);
-
-if (result == true && mounted) {
-  Navigator.pop(context, image.path);
-}
+    Navigator.pop(context, image.path);
   }
 
   @override
@@ -82,51 +70,20 @@ if (result == true && mounted) {
     }
 
     return Scaffold(
-      backgroundColor: Colors.black,
+      appBar: AppBar(
+        title: const Text('Capture Packaging Panel'),
+        centerTitle: true,
+      ),
       body: Stack(
         children: [
-          Positioned.fill(
-            child: CameraPreview(_controller!),
-          ),
-
-          Positioned(
-            top: 50,
-            left: 20,
-            child: IconButton(
-              onPressed: () => Navigator.pop(context),
-              icon: const Icon(
-                Icons.close,
-                color: Colors.white,
-                size: 30,
-              ),
-            ),
-          ),
-
-          Positioned(
-            bottom: 40,
-            left: 0,
-            right: 0,
-            child: Center(
-              child: GestureDetector(
-                onTap: _takePicture,
-                child: Container(
-                  width: 75,
-                  height: 75,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    border: Border.all(
-                      color: Colors.white,
-                      width: 5,
-                    ),
-                  ),
-                  child: const Center(
-                    child: Icon(
-                      Icons.camera_alt,
-                      color: Colors.white,
-                      size: 35,
-                    ),
-                  ),
-                ),
+          CameraPreview(_controller!),
+          Align(
+            alignment: Alignment.bottomCenter,
+            child: Padding(
+              padding: const EdgeInsets.only(bottom: 30),
+              child: FloatingActionButton.large(
+                onPressed: _takePicture,
+                child: const Icon(Icons.camera_alt, size: 36),
               ),
             ),
           ),

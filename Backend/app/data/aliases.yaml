@@ -1,0 +1,164 @@
+# PackSentry Statutory Declaration Alias Table
+# Version: 2026.09.01
+# Maps surface phrases to LMPC Field enums for deterministic anchor matching.
+# Matching order: longest alias first against normalized_text.
+
+NET_QUANTITY:
+  - "net quantity"
+  - "net contents"
+  - "net weight"
+  - "net volume"
+  - "net content"
+  - "net qty"
+  - "net wt"
+  - "net vol"
+  - "net mass"
+  - "contents"
+  - "शुद्ध मात्रा"
+  - "निवल मात्रा"
+  - "शुद्ध वजन"
+  - "कुल वजन"
+
+RETAIL_SALE_PRICE:
+  - "maximum retail price"
+  - "max retail price"
+  - "max. retail price"
+  - "retail sale price"
+  - "retail price"
+  - "अधिकतम खुदरा मूल्य"
+  - "खुदरा मूल्य"
+  - "मूल्य"
+  - "mrp"
+  - "rsp"
+
+DATE_OF_MANUFACTURE_PACKING_IMPORT:
+  - "date of manufacture"
+  - "date of manufacturing"
+  - "date of packing"
+  - "date of import"
+  - "manufacture date"
+  - "manufacturing date"
+  - "packed on"
+  - "mfg date"
+  - "pkd date"
+  - "imported on"
+  - "month & year of pkg"
+  - "month & year of mfg"
+  - "month and year of manufacture"
+  - "month and year of packing"
+  - "निर्माण तिथि"
+  - "पैकिंग तिथि"
+  - "आयात तिथि"
+  - "mfd"
+  - "mfg"
+  - "pkd"
+
+MANUFACTURER_NAME_ADDRESS:
+  - "manufactured by"
+  - "manufactured and packed by"
+  - "manufactured & packed by"
+  - "mfd. by"
+  - "mfd by"
+  - "mfg. by"
+  - "mfg by"
+  - "उत्पादक"
+  - "निर्माता"
+
+PACKER_NAME_ADDRESS:
+  - "packed by"
+  - "marketed and packed by"
+  - "marketed & packed by"
+  - "pkd. by"
+  - "pkd by"
+  - "पैकर"
+
+IMPORTER_NAME_ADDRESS:
+  - "imported by"
+  - "imported and marketed by"
+  - "imported & marketed by"
+  - "imp. by"
+  - "imp by"
+  - "आयातकर्ता"
+
+COUNTRY_OF_ORIGIN:
+  - "country of origin"
+  - "country of manufacture"
+  - "country of assembly"
+  - "made in"
+  - "product of"
+  - "origin"
+  - "उत्पत्ति का देश"
+
+COMMON_GENERIC_NAME:
+  - "common or generic name"
+  - "common / generic name"
+  - "generic name"
+  - "common name"
+  - "commodity"
+  - "product name"
+  - "उत्पाद का नाम"
+  - "वस्तु का नाम"
+
+CONSUMER_CARE:
+  - "consumer care cell"
+  - "consumer care details"
+  - "customer care cell"
+  - "customer care details"
+  - "customer care executive"
+  - "consumer care helpline"
+  - "customer support"
+  - "consumer care"
+  - "customer care"
+  - "helpline number"
+  - "toll free no"
+  - "toll free number"
+  - "toll free"
+  - "contact us"
+  - "for complaints"
+  - "queries / feedback"
+  - "queries/feedback"
+  - "उपभोक्ता देखभाल"
+  - "ग्राहक सेवा"
+
+COMMODITY_DIMENSIONS:
+  - "dimensions"
+  - "finished dimensions"
+  - "dimension"
+  - "package size"
+  - "size"
+  - "विमाएं"
+  - "आकार"
+
+PIECE_COUNT:
+  - "number of pieces"
+  - "number of units"
+  - "total pieces"
+  - "piece count"
+  - "unit count"
+  - "pieces"
+  - "units"
+  - "pcs"
+  - "संख्या"
+  - "नग"
+
+USABLE_SHEET_COUNT:
+  - "usable sheet count"
+  - "number of sheets"
+  - "usable sheets"
+  - "total sheets"
+  - "sheets"
+  - "शीटों की संख्या"
+  - "शीट"
+
+SHEET_DIMENSIONS:
+  - "sheet dimensions"
+  - "sheet size"
+  - "per sheet size"
+  - "size of each sheet"
+  - "sheet width x length"
+
+PER_PIECE_ENTRIES:
+  - "per piece details"
+  - "items in package"
+  - "package contents"
+  - "contents detail"

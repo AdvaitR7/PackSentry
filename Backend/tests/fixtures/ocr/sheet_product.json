@@ -1,0 +1,124 @@
+{
+  "ocr_engine": "paddleocr",
+  "ocr_version": "2.8.0",
+  "images": [
+    {
+      "image_id": "img_sheet_pdp",
+      "role": "PDP",
+      "analysis_width": 1200,
+      "analysis_height": 1600,
+      "original_width": 3024,
+      "original_height": 4032,
+      "transform": {
+        "rotation_deg": 0.0,
+        "scale_x": 0.3968,
+        "scale_y": 0.3968,
+        "offset_x": 0.0,
+        "offset_y": 0.0
+      },
+      "lines": [
+        {
+          "line_id": "img_sheet_pdp:l001",
+          "raw_text": "SOFTTOUCH FACIAL TISSUES",
+          "confidence": 0.983,
+          "polygon_analysis": [[250, 200], [950, 200], [950, 260], [250, 260]],
+          "polygon_original": [[630, 504], [2394, 504], [2394, 655], [630, 655]],
+          "polygon_normalized": [[0.208, 0.125], [0.791, 0.125], [0.791, 0.162], [0.208, 0.162]],
+          "script": "LATIN",
+          "words": []
+        },
+        {
+          "line_id": "img_sheet_pdp:l002",
+          "raw_text": "Contains 100 Sheets",
+          "confidence": 0.977,
+          "polygon_analysis": [[380, 780], [820, 780], [820, 830], [380, 830]],
+          "polygon_original": [[957, 1965], [2066, 1965], [2066, 2091], [957, 2091]],
+          "polygon_normalized": [[0.316, 0.487], [0.683, 0.487], [0.683, 0.518], [0.316, 0.518]],
+          "script": "LATIN",
+          "words": [
+            { "raw_text": "Contains", "confidence": 0.98, "polygon_normalized": [[0.316, 0.487], [0.480, 0.487], [0.480, 0.518], [0.316, 0.518]] },
+            { "raw_text": "100", "confidence": 0.99, "polygon_normalized": [[0.490, 0.487], [0.560, 0.487], [0.560, 0.518], [0.490, 0.518]] },
+            { "raw_text": "Sheets", "confidence": 0.97, "polygon_normalized": [[0.570, 0.487], [0.683, 0.487], [0.683, 0.518], [0.570, 0.518]] }
+          ]
+        },
+        {
+          "line_id": "img_sheet_pdp:l003",
+          "raw_text": "Sheet Size: 21 cm x 21 cm",
+          "confidence": 0.970,
+          "polygon_analysis": [[360, 860], [840, 860], [840, 910], [360, 910]],
+          "polygon_original": [[907, 2166], [2116, 2166], [2116, 2292], [907, 2292]],
+          "polygon_normalized": [[0.300, 0.537], [0.700, 0.537], [0.700, 0.568], [0.300, 0.568]],
+          "script": "LATIN",
+          "words": []
+        },
+        {
+          "line_id": "img_sheet_pdp:l004",
+          "raw_text": "MRP Rs. 99.00 incl. of all taxes",
+          "confidence": 0.960,
+          "polygon_analysis": [[350, 950], [850, 950], [850, 1000], [350, 1000]],
+          "polygon_original": [[882, 2394], [2142, 2394], [2142, 2520], [882, 2520]],
+          "polygon_normalized": [[0.291, 0.593], [0.708, 0.593], [0.708, 0.625], [0.291, 0.625]],
+          "script": "LATIN",
+          "words": []
+        }
+      ]
+    },
+    {
+      "image_id": "img_sheet_back",
+      "role": "BACK",
+      "analysis_width": 1200,
+      "analysis_height": 1600,
+      "original_width": 3024,
+      "original_height": 4032,
+      "transform": {
+        "rotation_deg": 0.0,
+        "scale_x": 0.3968,
+        "scale_y": 0.3968,
+        "offset_x": 0.0,
+        "offset_y": 0.0
+      },
+      "lines": [
+        {
+          "line_id": "img_sheet_back:l001",
+          "raw_text": "MANUFACTURED BY: SoftTouch Paper Products, 5 Industrial Estate, Coimbatore, Tamil Nadu 641021",
+          "confidence": 0.946,
+          "polygon_analysis": [[150, 330], [1050, 330], [1050, 400], [150, 400]],
+          "polygon_original": [[378, 832], [2646, 832], [2646, 1008], [378, 1008]],
+          "polygon_normalized": [[0.125, 0.206], [0.875, 0.206], [0.875, 0.250], [0.125, 0.250]],
+          "script": "LATIN",
+          "words": []
+        },
+        {
+          "line_id": "img_sheet_back:l002",
+          "raw_text": "PKD: 05/2026",
+          "confidence": 0.986,
+          "polygon_analysis": [[150, 430], [420, 430], [420, 480], [150, 480]],
+          "polygon_original": [[378, 1083], [1058, 1083], [1058, 1209], [378, 1209]],
+          "polygon_normalized": [[0.125, 0.268], [0.350, 0.268], [0.350, 0.300], [0.125, 0.300]],
+          "script": "LATIN",
+          "words": []
+        },
+        {
+          "line_id": "img_sheet_back:l003",
+          "raw_text": "Consumer Care: care@softtouch.in, Tel: 0422-2456789",
+          "confidence": 0.941,
+          "polygon_analysis": [[150, 510], [780, 510], [780, 560], [150, 560]],
+          "polygon_original": [[378, 1285], [1966, 1285], [1966, 1411], [378, 1411]],
+          "polygon_normalized": [[0.125, 0.318], [0.650, 0.318], [0.650, 0.350], [0.125, 0.350]],
+          "script": "LATIN",
+          "words": []
+        },
+        {
+          "line_id": "img_sheet_back:l004",
+          "raw_text": "Country of Origin: India",
+          "confidence": 0.990,
+          "polygon_analysis": [[150, 590], [550, 590], [550, 630], [150, 630]],
+          "polygon_original": [[378, 1487], [1386, 1487], [1386, 1587], [378, 1587]],
+          "polygon_normalized": [[0.125, 0.368], [0.458, 0.368], [0.458, 0.393], [0.125, 0.393]],
+          "script": "LATIN",
+          "words": []
+        }
+      ]
+    }
+  ]
+}

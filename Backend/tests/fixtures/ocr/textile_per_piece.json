@@ -1,0 +1,120 @@
+{
+  "ocr_engine": "paddleocr",
+  "ocr_version": "2.8.0",
+  "images": [
+    {
+      "image_id": "img_textile_pdp",
+      "role": "PDP",
+      "analysis_width": 1200,
+      "analysis_height": 1600,
+      "original_width": 3024,
+      "original_height": 4032,
+      "transform": {
+        "rotation_deg": 0.0,
+        "scale_x": 0.3968,
+        "scale_y": 0.3968,
+        "offset_x": 0.0,
+        "offset_y": 0.0
+      },
+      "lines": [
+        {
+          "line_id": "img_textile_pdp:l001",
+          "raw_text": "FABTEXTILES PURE COTTON BEDSHEET SET",
+          "confidence": 0.984,
+          "polygon_analysis": [[200, 180], [1000, 180], [1000, 240], [200, 240]],
+          "polygon_original": [[504, 453], [2520, 453], [2520, 604], [504, 604]],
+          "polygon_normalized": [[0.166, 0.112], [0.833, 0.112], [0.833, 0.150], [0.166, 0.150]],
+          "script": "LATIN",
+          "words": []
+        },
+        {
+          "line_id": "img_textile_pdp:l002",
+          "raw_text": "Net Quantity: 3 N (1 Set)",
+          "confidence": 0.976,
+          "polygon_analysis": [[350, 720], [850, 720], [850, 770], [350, 770]],
+          "polygon_original": [[882, 1814], [2142, 1814], [2142, 1940], [882, 1940]],
+          "polygon_normalized": [[0.291, 0.450], [0.708, 0.450], [0.708, 0.481], [0.291, 0.481]],
+          "script": "LATIN",
+          "words": []
+        },
+        {
+          "line_id": "img_textile_pdp:l003",
+          "raw_text": "Contents: 1 Bedsheet 2.25 m x 2.50 m, 2 Pillow Covers 46 cm x 69 cm",
+          "confidence": 0.962,
+          "polygon_analysis": [[150, 800], [1050, 800], [1050, 860], [150, 860]],
+          "polygon_original": [[378, 2016], [2646, 2016], [2646, 2167], [378, 2167]],
+          "polygon_normalized": [[0.125, 0.500], [0.875, 0.500], [0.875, 0.537], [0.125, 0.537]],
+          "script": "LATIN",
+          "words": []
+        },
+        {
+          "line_id": "img_textile_pdp:l004",
+          "raw_text": "MRP Rs. 1499.00 (inclusive of all taxes)",
+          "confidence": 0.968,
+          "polygon_analysis": [[300, 920], [900, 920], [900, 970], [300, 970]],
+          "polygon_original": [[756, 2318], [2268, 2318], [2268, 2444], [756, 2444]],
+          "polygon_normalized": [[0.250, 0.575], [0.750, 0.575], [0.750, 0.606], [0.250, 0.606]],
+          "script": "LATIN",
+          "words": []
+        }
+      ]
+    },
+    {
+      "image_id": "img_textile_back",
+      "role": "BACK",
+      "analysis_width": 1200,
+      "analysis_height": 1600,
+      "original_width": 3024,
+      "original_height": 4032,
+      "transform": {
+        "rotation_deg": 0.0,
+        "scale_x": 0.3968,
+        "scale_y": 0.3968,
+        "offset_x": 0.0,
+        "offset_y": 0.0
+      },
+      "lines": [
+        {
+          "line_id": "img_textile_back:l001",
+          "raw_text": "MANUFACTURED BY: FabTextiles India Pvt Ltd, 12 Textile Park, Surat, Gujarat 395002",
+          "confidence": 0.948,
+          "polygon_analysis": [[150, 320], [1050, 320], [1050, 390], [150, 390]],
+          "polygon_original": [[378, 806], [2646, 806], [2646, 982], [378, 982]],
+          "polygon_normalized": [[0.125, 0.200], [0.875, 0.200], [0.875, 0.243], [0.125, 0.243]],
+          "script": "LATIN",
+          "words": []
+        },
+        {
+          "line_id": "img_textile_back:l002",
+          "raw_text": "MFG: 07/2026",
+          "confidence": 0.982,
+          "polygon_analysis": [[150, 420], [420, 420], [420, 470], [150, 470]],
+          "polygon_original": [[378, 1058], [1058, 1058], [1058, 1184], [378, 1184]],
+          "polygon_normalized": [[0.125, 0.262], [0.350, 0.262], [0.350, 0.294], [0.125, 0.294]],
+          "script": "LATIN",
+          "words": []
+        },
+        {
+          "line_id": "img_textile_back:l003",
+          "raw_text": "Consumer Complaints: care@fabtextiles.in, Toll Free: 1800-123-9999",
+          "confidence": 0.944,
+          "polygon_analysis": [[150, 500], [900, 500], [900, 550], [150, 550]],
+          "polygon_original": [[378, 1260], [2268, 1260], [2268, 1386], [378, 1386]],
+          "polygon_normalized": [[0.125, 0.312], [0.750, 0.312], [0.750, 0.344], [0.125, 0.344]],
+          "script": "LATIN",
+          "words": []
+        },
+        {
+          "line_id": "img_textile_back:l004",
+          "raw_text": "Country of Origin: India",
+          "confidence": 0.989,
+          "polygon_analysis": [[150, 580], [550, 580], [550, 620], [150, 620]],
+          "polygon_original": [[378, 1461], [1386, 1461], [1386, 1562], [378, 1562]],
+          "polygon_normalized": [[0.125, 0.362], [0.458, 0.362], [0.458, 0.387], [0.125, 0.387]],
+          "script": "LATIN",
+          "words": []
+        }
+      ]
+    }
+  ]
+}
