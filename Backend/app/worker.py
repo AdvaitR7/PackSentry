@@ -198,6 +198,12 @@ class InspectionWorker:
                     cleanup_scratch_dir(inspection_id)
                 self.queue.task_done()
 
+    async def _advance_stage(self, inspection_id: str, status: InspectionStatus, message: str) -> None:
+        """Publishes a stage transition to the in-memory registry and the DB checkpoint."""
+        await self.registry.update_stage(inspection_id, status, message)
+        async with acquire_connection() as conn:
+            await inspection_repo.update_stage_checkpoint(conn, inspection_id, status.value)
+
     async def _execute_pipeline(self, inspection_id: str) -> None:
         """Executes the complete end-to-end statutory inspection pipeline."""
         scratch_dir = get_scratch_dir(inspection_id)
@@ -217,9 +223,7 @@ class InspectionWorker:
         # ---------------------------------------------------------------------
         # Stage 1: PREPROCESSING (EXIF, 1600px resize, Transform calculation)
         # ---------------------------------------------------------------------
-        await self.registry.update_stage(inspection_id, InspectionStatus.PREPROCESSING, "Normalizing EXIF orientation and scaling images")
-        async with acquire_connection() as conn:
-            await inspection_repo.update_stage_checkpoint(conn, inspection_id, "PREPROCESSING")
+        await self._advance_stage(inspection_id, InspectionStatus.PREPROCESSING, "Normalizing EXIF orientation and scaling images")
 
         preprocessed_panels: Dict[PanelRole, Dict[str, Any]] = {}
         for role_str, file_info in manifest.items():
@@ -262,9 +266,7 @@ class InspectionWorker:
         # ---------------------------------------------------------------------
         # Stage 2: OCR (Cloud Vision primary -> automatic PaddleOCR fallback)
         # ---------------------------------------------------------------------
-        await self.registry.update_stage(inspection_id, InspectionStatus.OCR, "Detecting package text and calculating coordinate mappings")
-        async with acquire_connection() as conn:
-            await inspection_repo.update_stage_checkpoint(conn, inspection_id, "OCR")
+        await self._advance_stage(inspection_id, InspectionStatus.OCR, "Detecting package text and calculating coordinate mappings")
 
         image_slots: List[ImageSlot] = []
         engines_used: List[str] = []
@@ -293,9 +295,7 @@ class InspectionWorker:
         # ---------------------------------------------------------------------
         # Stage 3: EXTRACTING (Normalisation + Deterministic Parsers D1-D6)
         # ---------------------------------------------------------------------
-        await self.registry.update_stage(inspection_id, InspectionStatus.EXTRACTING, "Extracting statutory declarations and validating SI units")
-        async with acquire_connection() as conn:
-            await inspection_repo.update_stage_checkpoint(conn, inspection_id, "EXTRACTING")
+        await self._advance_stage(inspection_id, InspectionStatus.EXTRACTING, "Extracting statutory declarations and validating SI units")
 
         norm_doc = build_normalised_document(ocr_doc)
         declaration_set = extract_declarations(norm_doc, ocr_doc, capture_ctx)
@@ -322,9 +322,7 @@ class InspectionWorker:
         # ---------------------------------------------------------------------
         # Stage 4: EVALUATING (Phase 2 23-Rule Statutory Engine)
         # ---------------------------------------------------------------------
-        await self.registry.update_stage(inspection_id, InspectionStatus.EVALUATING, "Adjudicating Legal Metrology compliance across 23 statutory rules")
-        async with acquire_connection() as conn:
-            await inspection_repo.update_stage_checkpoint(conn, inspection_id, "EVALUATING")
+        await self._advance_stage(inspection_id, InspectionStatus.EVALUATING, "Adjudicating Legal Metrology compliance across 23 statutory rules")
 
         scan_date_val = capture_ctx.captured_at.date() if isinstance(capture_ctx.captured_at, datetime) else date.today()
         prod_ctx = ProductContext(
@@ -342,9 +340,7 @@ class InspectionWorker:
         # ---------------------------------------------------------------------
         # Stage 5: PERSISTING (Storage upload, signed URLs, DB transaction)
         # ---------------------------------------------------------------------
-        await self.registry.update_stage(inspection_id, InspectionStatus.PERSISTING, "Saving evidence snapshots and minting verification URLs")
-        async with acquire_connection() as conn:
-            await inspection_repo.update_stage_checkpoint(conn, inspection_id, "PERSISTING")
+        await self._advance_stage(inspection_id, InspectionStatus.PERSISTING, "Saving evidence snapshots and minting verification URLs")
 
         completed_at = datetime.now(timezone.utc)
         image_infos: List[InspectionImageInfo] = []

@@ -24,6 +24,11 @@ from .helpers import declaration_found, find_declaration, methods_used_for, raw_
 from .spec import RuleOutcome, RuleSpec
 
 
+def _merge_evidence(*declarations) -> List:
+    """Concatenates evidence from each present declaration, preserving order."""
+    return [span for decl in declarations if decl for span in decl.evidence]
+
+
 # -------------------------------------------------------------------------
 # Rule 14: Textile and Household Commodities (Number + Finished Dimensions)
 # -------------------------------------------------------------------------
@@ -58,18 +63,13 @@ def evaluate_r14_textile(declarations: DeclarationSet, context: ProductContext) 
             methods_used=methods,
         )
 
-    evidence = []
-    for d in consulted:
-        if d:
-            evidence.extend(d.evidence)
-
     return RuleOutcome(
         verdict=InternalVerdict.COMPLIANT,
         reason_code="TEXTILE_DECLARATIONS_COMPLIANT",
         message="Textile product declares piece count and finished dimensions in compliance with Rule 14.",
         observed=raw_text_of(decl_entries) or raw_text_of(decl_dim),
         expected="Number of pieces and finished dimensions",
-        evidence=evidence,
+        evidence=_merge_evidence(*consulted),
         methods_used=methods,
     )
 
@@ -89,7 +89,7 @@ def evaluate_r15_price_related_dimensions(declarations: DeclarationSet, context:
             reason_code="PRICE_DIMENSIONS_DECLARED",
             message="Relevant dimensions or net weight bearing upon commodity price are declared.",
             observed=raw_text_of(decl_dim) or raw_text_of(decl_qty),
-            evidence=(decl_dim.evidence if decl_dim else []) + (decl_qty.evidence if decl_qty else []),
+            evidence=_merge_evidence(decl_dim, decl_qty),
             methods_used=methods,
         )
 
@@ -145,18 +145,13 @@ def evaluate_r16_usable_sheets(declarations: DeclarationSet, context: ProductCon
             methods_used=methods,
         )
 
-    evidence = []
-    for d in consulted:
-        if d:
-            evidence.extend(d.evidence)
-
     return RuleOutcome(
         verdict=InternalVerdict.COMPLIANT,
         reason_code="SHEET_DECLARATIONS_COMPLIANT",
         message="Usable sheet count and per-sheet dimensions declared in compliance with Rule 16.",
         observed=f"{raw_text_of(decl_sheets)}, {raw_text_of(decl_dims)}",
         expected="Number of usable sheets and dimensions of each sheet",
-        evidence=evidence,
+        evidence=_merge_evidence(*consulted),
         methods_used=methods,
     )
 
@@ -182,14 +177,13 @@ def evaluate_r17_container_type(declarations: DeclarationSet, context: ProductCo
             methods_used=methods,
         )
 
-    evidence = (decl_count.evidence if decl_count else []) + (decl_dim.evidence if decl_dim else [])
     return RuleOutcome(
         verdict=InternalVerdict.COMPLIANT,
         reason_code="CONTAINER_DECLARATIONS_COMPLIANT",
         message="Container count and dimensions declared in compliance with Rule 17.",
         observed=f"{raw_text_of(decl_count)}, {raw_text_of(decl_dim)}",
         expected="Number of containers and dimensions",
-        evidence=evidence,
+        evidence=_merge_evidence(decl_count, decl_dim),
         methods_used=methods,
     )
 
