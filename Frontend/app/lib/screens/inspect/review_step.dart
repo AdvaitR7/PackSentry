@@ -7,9 +7,13 @@ import '../processing_screen.dart';
 class ReviewStep extends StatelessWidget {
   const ReviewStep({super.key});
 
+  /// Fixed-width so up to six panels can scroll horizontally without overflowing.
+  static const double _thumbWidth = 104;
+
   Widget _thumb(Uint8ListLabel label) {
     if (label.bytes == null) {
-      return Expanded(
+      return SizedBox(
+        width: _thumbWidth,
         child: Column(
           children: [
             Container(
@@ -26,7 +30,8 @@ class ReviewStep extends StatelessWidget {
         ),
       );
     }
-    return Expanded(
+    return SizedBox(
+      width: _thumbWidth,
       child: Column(
         children: [
           ClipRRect(
@@ -88,14 +93,19 @@ class ReviewStep extends StatelessWidget {
             const SizedBox(height: 20),
             const Text('Captured Panels', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
             const SizedBox(height: 10),
-            Row(
-              children: [
-                _thumb(Uint8ListLabel('PDP', controller.pdpBytes)),
-                const SizedBox(width: 10),
-                _thumb(Uint8ListLabel('Back', controller.backBytes)),
-                const SizedBox(width: 10),
-                _thumb(Uint8ListLabel('Side', controller.sideBytes)),
-              ],
+            SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Row(
+                children: [
+                  _thumb(Uint8ListLabel('PDP', controller.pdpBytes)),
+                  const SizedBox(width: 10),
+                  _thumb(Uint8ListLabel('Back', controller.backBytes)),
+                  for (var i = 0; i < controller.sideImages.length; i++) ...[
+                    const SizedBox(width: 10),
+                    _thumb(Uint8ListLabel('Side ${i + 1}', controller.sideImages[i])),
+                  ],
+                ],
+              ),
             ),
             const SizedBox(height: 32),
             SizedBox(
@@ -113,7 +123,7 @@ class ReviewStep extends StatelessWidget {
                               captureContext: controller.buildCaptureContext(),
                               pdpBytes: controller.pdpBytes!,
                               backBytes: controller.backBytes!,
-                              sideBytes: controller.sideBytes,
+                              sideImages: controller.sideImages,
                             ),
                           ),
                         );

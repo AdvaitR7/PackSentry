@@ -225,9 +225,11 @@ class InspectionWorker:
         # ---------------------------------------------------------------------
         await self._advance_stage(inspection_id, InspectionStatus.PREPROCESSING, "Normalizing EXIF orientation and scaling images")
 
-        preprocessed_panels: Dict[PanelRole, Dict[str, Any]] = {}
-        for role_str, file_info in manifest.items():
-            role = PanelRole(role_str)
+        # The manifest is an ordered list, not a role-keyed map: several SIDE
+        # panels share one role, and their order sets extraction precedence.
+        preprocessed_panels: List[Dict[str, Any]] = []
+        for file_info in manifest:
+            role = PanelRole(file_info["role"])
             raw_path = scratch_dir / file_info["filename"]
             with open(raw_path, "rb") as f_in:
                 raw_bytes = f_in.read()
@@ -244,12 +246,16 @@ class InspectionWorker:
             transform = processed.transform
 
             # Save analysis image to scratch
-            analysis_filename = f"{role.value.lower()}_analysis.jpg"
+            key = file_info["slot_key"]
+            analysis_filename = f"{key}_analysis.jpg"
             analysis_path = scratch_dir / analysis_filename
             with open(analysis_path, "wb") as f_out:
                 f_out.write(analysis_bytes)
 
-            preprocessed_panels[role] = {
+            preprocessed_panels.append({
+                "role": role,
+                "seq": file_info["seq"],
+                "slot_key": key,
                 "image_id": file_info["image_id"],
                 "raw_bytes": raw_bytes,
                 "analysis_bytes": analysis_bytes,
@@ -261,7 +267,7 @@ class InspectionWorker:
                 "original_filename": file_info["filename"],
                 "analysis_filename": analysis_filename,
                 "sha256": file_info["sha256"],
-            }
+            })
 
         # ---------------------------------------------------------------------
         # Stage 2: OCR (Cloud Vision primary -> automatic PaddleOCR fallback)
@@ -271,10 +277,10 @@ class InspectionWorker:
         image_slots: List[ImageSlot] = []
         engines_used: List[str] = []
 
-        for role, panel in preprocessed_panels.items():
+        for panel in preprocessed_panels:
             slot, engine_used = await self.ocr_router.recognize_panel(
                 analysis_bytes=panel["analysis_bytes"],
-                role=role,
+                role=panel["role"],
                 image_id=panel["image_id"],
                 analysis_width=panel["ana_w"],
                 analysis_height=panel["ana_h"],
@@ -307,7 +313,10 @@ class InspectionWorker:
                 existing_decl = next((d for d in declaration_set.declarations if d.field == crit_field), None)
                 if existing_decl is None or existing_decl.status.value != "FOUND":
                     # Query VLM using PDP image
-                    pdp_panel = preprocessed_panels.get(PanelRole.PDP)
+                    pdp_panel = next(
+                        (p for p in preprocessed_panels if p["role"] == PanelRole.PDP),
+                        None,
+                    )
                     if pdp_panel:
                         vlm_decl = await self.vlm_interpreter.interpret_field(
                             field=crit_field,
@@ -346,12 +355,14 @@ class InspectionWorker:
         image_infos: List[InspectionImageInfo] = []
         db_image_records: List[Dict[str, Any]] = []
 
-        for role, panel in preprocessed_panels.items():
-            orig_path = f"{inspection_id}/{role.value.lower()}_original.jpg"
+        for panel in preprocessed_panels:
+            role = panel["role"]
+            key = panel["slot_key"]
+            orig_path = f"{inspection_id}/{key}_original.jpg"
             ana_path = f"{inspection_id}/{panel['analysis_filename']}"
 
-            orig_url = f"/v1/inspections/{inspection_id}/images/{role.value.lower()}/original"
-            ana_url = f"/v1/inspections/{inspection_id}/images/{role.value.lower()}/analysis"
+            orig_url = f"/v1/inspections/{inspection_id}/images/{key}/original"
+            ana_url = f"/v1/inspections/{inspection_id}/images/{key}/analysis"
 
             # Upload to private Supabase Storage if configured
             if is_storage_configured():
@@ -382,6 +393,7 @@ class InspectionWorker:
                 "id": panel["image_id"],
                 "inspection_id": inspection_id,
                 "role": role.value,
+                "seq": panel["seq"],
                 "storage_path": orig_path,
                 "sha256": panel["sha256"],
                 "width": panel["orig_w"],

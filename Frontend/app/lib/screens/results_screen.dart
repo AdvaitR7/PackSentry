@@ -6,6 +6,17 @@ class ResultsScreen extends StatelessWidget {
 
   const ResultsScreen({super.key, required this.response});
 
+  /// Labels the evidence card at [index]. An inspection may carry several SIDE
+  /// panels, so a role shared by more than one image is numbered to keep the
+  /// cards distinguishable; unique roles (PDP, BACK) stay bare.
+  String _panelLabel(List<InspectionImageInfo> images, int index) {
+    final role = images[index].role;
+    final total = images.where((img) => img.role == role).length;
+    if (total < 2) return role.name;
+    final ordinal = images.take(index + 1).where((img) => img.role == role).length;
+    return '${role.name} $ordinal';
+  }
+
   Color _bucketColor(UiBucket bucket) {
     switch (bucket) {
       case UiBucket.COMPLIANT:
@@ -285,7 +296,7 @@ class ResultsScreen extends StatelessWidget {
                                 borderRadius: BorderRadius.vertical(bottom: Radius.circular(11)),
                               ),
                               child: Text(
-                                img.role.name,
+                                _panelLabel(response.images!, index),
                                 textAlign: TextAlign.center,
                                 style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold),
                               ),

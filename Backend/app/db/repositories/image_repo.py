@@ -16,21 +16,24 @@ async def record_inspection_images(
     """
     Bulk inserts image metadata rows.
     Each image dict requires: id, inspection_id, role, storage_path, sha256, width, height.
+    `seq` is the 1-based sequence within a role (several SIDE panels share a role)
+    and defaults to 1.
     """
     if conn is None or not images:
         return
     await conn.executemany(
         """
         INSERT INTO app.inspection_image (
-            id, inspection_id, role, storage_path, sha256, width, height
+            id, inspection_id, role, seq, storage_path, sha256, width, height
         )
-        VALUES ($1, $2, $3, $4, $5, $6, $7);
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8);
         """,
         [
             (
                 img["id"],
                 img["inspection_id"],
                 img["role"],
+                img.get("seq", 1),
                 img["storage_path"],
                 img["sha256"],
                 img["width"],
@@ -50,10 +53,10 @@ async def get_images_for_inspection(
         return []
     rows = await conn.fetch(
         """
-        SELECT id, role, storage_path, sha256, width, height
+        SELECT id, role, seq, storage_path, sha256, width, height
         FROM app.inspection_image
         WHERE inspection_id = $1
-        ORDER BY role;
+        ORDER BY role, seq;
         """,
         inspection_id,
     )

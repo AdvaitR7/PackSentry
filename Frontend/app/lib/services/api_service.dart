@@ -74,15 +74,15 @@ class ApiService {
   }
 
   /// Initiates a statutory packaging compliance inspection (POST /v1/inspections).
-  /// Sends multipart request with context JSON, required PDP and BACK panels, and optional SIDE panel.
+  /// Sends multipart request with context JSON, required PDP and BACK panels, and
+  /// up to four optional additional panels sent as repeated SIDE parts.
   Future<Map<String, dynamic>> createInspection({
     required CaptureContext context,
     required Uint8List pdpBytes,
     String pdpName = 'pdp.jpg',
     required Uint8List backBytes,
     String backName = 'back.jpg',
-    Uint8List? sideBytes,
-    String sideName = 'side.jpg',
+    List<Uint8List> sideImages = const [],
     String? idempotencyKey,
   }) async {
     final resolvedBaseUrl = await resolveBaseUrl();
@@ -114,13 +114,16 @@ class ApiService {
       ),
     );
 
-    // Add optional SIDE panel
-    if (sideBytes != null && sideBytes.isNotEmpty) {
+    // Add each additional panel as a repeated SIDE part. The shared field name
+    // is what lets the backend collect them into one ordered list.
+    for (var i = 0; i < sideImages.length; i++) {
+      final bytes = sideImages[i];
+      if (bytes.isEmpty) continue;
       request.files.add(
         http.MultipartFile.fromBytes(
           'SIDE',
-          sideBytes,
-          filename: sideName,
+          bytes,
+          filename: 'side_${i + 1}.jpg',
         ),
       );
     }

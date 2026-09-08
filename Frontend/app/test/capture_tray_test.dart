@@ -35,15 +35,15 @@ void main() {
     await tester.pumpWidget(_wrap(controller));
     await tester.pumpAndSettle();
 
-    // All three panels start empty.
-    expect(find.text('Tap to photograph panel'), findsNWidgets(3));
+    // The two required panels start empty; additional panels appear only once added.
+    expect(find.text('Tap to photograph panel'), findsNWidgets(2));
     expect(find.text('Retake Photo'), findsNothing);
 
     // Simulate the camera screen returning bytes for the PDP panel.
     controller.setPdpBytes(_tinyPng);
     await tester.pumpAndSettle();
 
-    expect(find.text('Tap to photograph panel'), findsNWidgets(2));
+    expect(find.text('Tap to photograph panel'), findsOneWidget);
     expect(find.byType(Image), findsOneWidget);
     expect(find.text('Remove'), findsOneWidget);
     expect(find.text('Retake Photo'), findsOneWidget);
@@ -98,7 +98,67 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(controller.pdpBytes, isNull);
-    expect(find.text('Tap to photograph panel'), findsNWidgets(3));
+    expect(find.text('Tap to photograph panel'), findsNWidgets(2));
+  });
+
+  testWidgets('Additional panels can be added up to the cap, then the button hides', (
+    tester,
+  ) async {
+    final controller = InspectionWizardController();
+
+    await tester.pumpWidget(_wrap(controller));
+    await tester.pumpAndSettle();
+
+    // No additional panel cards exist until one is added.
+    expect(find.text('Additional Panel 1 (SIDE) (Optional)'), findsNothing);
+    expect(find.text('Add Additional Panel (Optional)'), findsOneWidget);
+
+    for (var i = 1; i <= InspectionWizardController.maxSideImages; i++) {
+      controller.addSideImage(_tinyPng);
+      await tester.pumpAndSettle();
+      expect(find.text('Additional Panel $i (SIDE) (Optional)'), findsOneWidget);
+    }
+
+    // At the cap the add button is replaced by an explanatory line.
+    expect(controller.canAddSideImage, isFalse);
+    expect(find.textContaining('Add Another Panel'), findsNothing);
+    expect(
+      find.text('Maximum of ${InspectionWizardController.maxSideImages} additional panels attached.'),
+      findsOneWidget,
+    );
+
+    // The cap is enforced in the controller, not just the UI.
+    controller.addSideImage(_tinyPng);
+    expect(controller.sideImages.length, InspectionWizardController.maxSideImages);
+
+    // Removing one frees a slot and renumbers the remaining cards.
+    controller.removeSideImageAt(0);
+    await tester.pumpAndSettle();
+    expect(controller.sideImages.length, InspectionWizardController.maxSideImages - 1);
+    expect(
+      find.text('Additional Panel ${InspectionWizardController.maxSideImages} (SIDE) (Optional)'),
+      findsNothing,
+    );
+  });
+
+  testWidgets('Additional panels do not gate Review & Submit', (tester) async {
+    final controller = InspectionWizardController();
+    controller.setPdpBytes(_tinyPng);
+    controller.setBackBytes(_tinyPng);
+
+    await tester.pumpWidget(_wrap(controller));
+    await tester.pumpAndSettle();
+
+    // PDP + BACK alone still unlock submission; extra panels stay optional.
+    expect(controller.sideImages, isEmpty);
+    expect(
+      tester
+          .widget<ElevatedButton>(
+            find.widgetWithText(ElevatedButton, 'Review & Submit Inspection'),
+          )
+          .onPressed,
+      isNotNull,
+    );
   });
 
   test('Built capture context sends required boolean fields, not null', () {

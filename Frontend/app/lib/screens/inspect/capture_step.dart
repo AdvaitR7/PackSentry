@@ -177,15 +177,53 @@ class CaptureStep extends StatelessWidget {
               onCapture: () => _captureFromCamera(context, 'Back', (bytes) => controller.setBackBytes(bytes)),
               onRemove: () => controller.setBackBytes(null),
             ),
-            _panelCard(
-              context: context,
-              title: 'Side Panel (SIDE)',
-              subtitle: 'Supplementary panel declarations if applicable.',
-              isRequired: false,
-              imageBytes: controller.sideBytes,
-              onCapture: () => _captureFromCamera(context, 'Side', (bytes) => controller.setSideBytes(bytes)),
-              onRemove: () => controller.setSideBytes(null),
-            ),
+            // Additional panels — up to InspectionWizardController.maxSideImages.
+            for (var i = 0; i < controller.sideImages.length; i++)
+              _panelCard(
+                context: context,
+                title: 'Additional Panel ${i + 1} (SIDE)',
+                subtitle: 'Supplementary panel declarations if applicable.',
+                isRequired: false,
+                imageBytes: controller.sideImages[i],
+                onCapture: () => _captureFromCamera(
+                  context,
+                  'Additional panel ${i + 1}',
+                  (bytes) => controller.replaceSideImageAt(i, bytes),
+                ),
+                onRemove: () => controller.removeSideImageAt(i),
+              ),
+
+            if (controller.canAddSideImage)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 16),
+                child: SizedBox(
+                  width: double.infinity,
+                  height: 52,
+                  child: OutlinedButton.icon(
+                    icon: const Icon(Icons.add_a_photo_outlined),
+                    label: Text(
+                      controller.sideImages.isEmpty
+                          ? 'Add Additional Panel (Optional)'
+                          : 'Add Another Panel '
+                              '(${controller.sideImages.length}/${InspectionWizardController.maxSideImages})',
+                    ),
+                    onPressed: () => _captureFromCamera(
+                      context,
+                      'Additional panel ${controller.sideImages.length + 1}',
+                      (bytes) => controller.addSideImage(bytes),
+                    ),
+                  ),
+                ),
+              )
+            else
+              const Padding(
+                padding: EdgeInsets.only(bottom: 16),
+                child: Text(
+                  'Maximum of '
+                  '${InspectionWizardController.maxSideImages} additional panels attached.',
+                  style: TextStyle(color: Colors.grey, fontSize: 13),
+                ),
+              ),
             const SizedBox(height: 8),
 
             // All Images Captured Toggle (ADR-0005 Absence Evidence Gate)

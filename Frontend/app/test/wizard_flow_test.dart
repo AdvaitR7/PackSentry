@@ -34,7 +34,7 @@ void main() {
     expect(find.text('New Inspection — 2/3 Capture'), findsOneWidget);
     expect(find.text('Principal Display Panel (PDP) *'), findsOneWidget);
     expect(find.text('Back Panel (BACK) *'), findsOneWidget);
-    expect(find.text('Side Panel (SIDE) (Optional)'), findsOneWidget);
+    expect(find.text('Add Additional Panel (Optional)'), findsOneWidget);
 
     // Verify that "All Images / Panels Captured" toggle is now present on CaptureStep
     expect(find.text('All Images / Panels Captured'), findsOneWidget);

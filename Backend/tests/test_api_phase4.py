@@ -232,6 +232,75 @@ def test_intake_multipart_success_returns_202_with_location(client):
     assert response.headers["Location"] == f"/v1/inspections/{res_data['inspection_id']}"
 
 
+def test_intake_accepts_four_additional_side_panels(client):
+    """POST /v1/inspections accepts the maximum of 4 repeated SIDE parts (6 panels total)."""
+    from app.db.scratch import get_scratch_dir
+    from app.panels import MAX_SIDE_PANELS
+
+    context_json = json.dumps({
+        "package_type": "RETAIL",
+        "commodity_category": "GENERAL",
+        "import_status": "DOMESTIC",
+        "all_panels_captured": True,
+        "inspector_id": "insp_test",
+        "captured_at": "2026-09-07T10:00:00Z",
+    })
+
+    files = [
+        ("PDP", ("pdp.jpg", _make_dummy_jpeg_bytes(text="Front PDP"), "image/jpeg")),
+        ("BACK", ("back.jpg", _make_dummy_jpeg_bytes(text="Back MRP 100"), "image/jpeg")),
+    ]
+    for i in range(1, MAX_SIDE_PANELS + 1):
+        files.append(("SIDE", (f"side{i}.jpg", _make_dummy_jpeg_bytes(text=f"Side {i}"), "image/jpeg")))
+
+    response = client.post("/v1/inspections", data={"context": context_json}, files=files)
+    assert response.status_code == 202
+    inspection_id = response.json()["inspection_id"]
+
+    # Every panel is staged under its own slot key, so none overwrite each other.
+    scratch_dir = get_scratch_dir(inspection_id)
+    assert (scratch_dir / "pdp_original.jpg").exists()
+    assert (scratch_dir / "back_original.jpg").exists()
+    for i in range(1, MAX_SIDE_PANELS + 1):
+        assert (scratch_dir / f"side_{i}_original.jpg").exists()
+
+    with open(scratch_dir / "manifest.json", "r", encoding="utf-8") as f:
+        manifest = json.load(f)
+
+    assert len(manifest) == 2 + MAX_SIDE_PANELS
+    # Order is significant: it sets extraction precedence.
+    assert [entry["slot_key"] for entry in manifest] == [
+        "pdp", "back", "side_1", "side_2", "side_3", "side_4",
+    ]
+    # Distinct image_ids keep per-panel evidence attributable.
+    assert len({entry["image_id"] for entry in manifest}) == 2 + MAX_SIDE_PANELS
+
+
+def test_intake_rejects_more_than_max_side_panels(client):
+    """One SIDE part over the cap is rejected with 422 before anything is staged."""
+    from app.panels import MAX_SIDE_PANELS
+
+    context_json = json.dumps({
+        "package_type": "RETAIL",
+        "commodity_category": "GENERAL",
+        "import_status": "DOMESTIC",
+        "all_panels_captured": True,
+        "inspector_id": "insp_test",
+        "captured_at": "2026-09-07T10:00:00Z",
+    })
+
+    files = [
+        ("PDP", ("pdp.jpg", _make_dummy_jpeg_bytes(text="Front PDP"), "image/jpeg")),
+        ("BACK", ("back.jpg", _make_dummy_jpeg_bytes(text="Back"), "image/jpeg")),
+    ]
+    for i in range(1, MAX_SIDE_PANELS + 2):
+        files.append(("SIDE", (f"side{i}.jpg", _make_dummy_jpeg_bytes(text=f"Side {i}"), "image/jpeg")))
+
+    response = client.post("/v1/inspections", data={"context": context_json}, files=files)
+    assert response.status_code == 422
+    assert str(MAX_SIDE_PANELS) in response.json()["detail"]
+
+
 def test_idempotency_key_replay(client):
     """Same idempotency key with identical payload returns existing inspection."""
     context_json = json.dumps({
@@ -359,22 +428,28 @@ async def test_worker_end_to_end_pipeline_execution():
     with open(scratch_dir / "context.json", "w", encoding="utf-8") as f:
         json.dump(context_dict, f)
 
-    manifest = {
-        PanelRole.PDP.value: {
+    manifest = [
+        {
+            "role": PanelRole.PDP.value,
+            "seq": 1,
+            "slot_key": "pdp",
             "filename": "pdp_original.jpg",
             "image_id": "img_pdp_01",
             "sha256": "fake_sha_pdp",
             "width": 400,
             "height": 400,
         },
-        PanelRole.BACK.value: {
+        {
+            "role": PanelRole.BACK.value,
+            "seq": 1,
+            "slot_key": "back",
             "filename": "back_original.jpg",
             "image_id": "img_back_01",
             "sha256": "fake_sha_back",
             "width": 400,
             "height": 400,
         },
-    }
+    ]
     with open(scratch_dir / "manifest.json", "w", encoding="utf-8") as f:
         json.dump(manifest, f)
 
@@ -396,3 +471,69 @@ async def test_worker_end_to_end_pipeline_execution():
     assert len(job.result.rule_results) >= 15
     assert job.result.engine.ocr_engine != ""
     assert job.result.completed_at is not None
+
+
+@pytest.mark.asyncio
+async def test_worker_processes_six_panels_end_to_end():
+    """
+    The pipeline is N-panel: a manifest carrying PDP, BACK and 4 SIDE panels
+    yields one evidence image per panel, with no slot collision between the
+    repeated SIDE roles.
+    """
+    from app.db.scratch import get_scratch_dir
+    from app.panels import MAX_SIDE_PANELS
+    from lmpc_schema import PanelRole
+
+    test_id = "insp_worker_sixpanel_001"
+    scratch_dir = get_scratch_dir(test_id)
+
+    manifest = []
+    panels = [(PanelRole.PDP, 1, "pdp", "Net Qty: 500 g MRP Rs. 250.00"), (PanelRole.BACK, 1, "back", "Mfg Date: 09/2026")]
+    panels += [(PanelRole.SIDE, i, f"side_{i}", f"Side panel {i}") for i in range(1, MAX_SIDE_PANELS + 1)]
+
+    for role, seq, key, text in panels:
+        filename = f"{key}_original.jpg"
+        with open(scratch_dir / filename, "wb") as f:
+            f.write(_make_dummy_jpeg_bytes(text=text))
+        manifest.append({
+            "role": role.value,
+            "seq": seq,
+            "slot_key": key,
+            "filename": filename,
+            "image_id": f"img_{key}",
+            "sha256": f"fake_sha_{key}",
+            "width": 400,
+            "height": 400,
+        })
+
+    context_dict = {
+        "package_type": "RETAIL",
+        "commodity_category": "GENERAL",
+        "import_status": "DOMESTIC",
+        "all_panels_captured": True,
+        "inspector_id": "insp_worker_tester",
+        "captured_at": datetime.now(timezone.utc).isoformat(),
+    }
+    with open(scratch_dir / "context.json", "w", encoding="utf-8") as f:
+        json.dump(context_dict, f)
+    with open(scratch_dir / "manifest.json", "w", encoding="utf-8") as f:
+        json.dump(manifest, f)
+
+    fake_engine = FakeFixtureOcrEngine()
+    worker = InspectionWorker(ocr_router=OcrRouter(primary=fake_engine, fallback=fake_engine))
+    await worker.registry.register(test_id, InspectionStatus.QUEUED)
+    await worker._execute_pipeline(test_id)
+
+    job = worker.registry.get(test_id)
+    assert job is not None
+    assert job.status == InspectionStatus.COMPLETE
+
+    # One evidence entry per panel, each with a distinct image_id and URL.
+    images = job.result.images
+    assert len(images) == 2 + MAX_SIDE_PANELS
+    assert len({img.image_id for img in images}) == 2 + MAX_SIDE_PANELS
+    assert len({img.original_url for img in images}) == 2 + MAX_SIDE_PANELS
+
+    # Each SIDE panel wrote its own analysis file rather than overwriting one.
+    for i in range(1, MAX_SIDE_PANELS + 1):
+        assert (scratch_dir / f"side_{i}_analysis.jpg").exists()
