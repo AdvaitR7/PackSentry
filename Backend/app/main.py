@@ -66,15 +66,10 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-# Loopback-only demo CORS policy per ADR-0009 and ADR-0015
+# Local demo & inspector client CORS policy per ADR-0009 and ADR-0015
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost",
-        "http://localhost:8080",
-        "http://127.0.0.1",
-        "http://10.0.2.2",
-    ],
+    allow_origins=["*"],
     allow_credentials=False,
     allow_methods=["GET", "POST", "OPTIONS"],
     allow_headers=["*"],

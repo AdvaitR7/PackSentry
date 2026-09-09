@@ -6,8 +6,10 @@ supabase>=2.8.0
 opencv-python-headless>=4.10.0
 numpy>=1.26.0
 python-multipart>=0.0.9
-paddlepaddle-gpu>=2.6.0; sys_platform == 'linux'
-paddleocr>=2.8.0
+paddlepaddle-gpu>=2.6.0,<3.0.0; sys_platform == 'linux'
+# PaddleOCR 3.x rewrote the pipeline on PaddleX and requires paddlepaddle 3.x,
+# which has no wheel for this GPU. Pinned to the 2.x line the adapter targets.
+paddleocr>=2.8.0,<3.0.0
 google-cloud-vision>=3.7.0
 httpx>=0.27.0
 pyyaml>=6.0.0

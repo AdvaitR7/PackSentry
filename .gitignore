@@ -19,6 +19,10 @@ env/
 .pytest_cache/
 .mypy_cache/
 
+# ─── Runtime Output ───────────────────────────────────────────────────────────
+Backend/app/received_scans/
+Backend/scratch/
+
 # ─── Environment & Secrets ────────────────────────────────────────────────────
 .env
 .env.*
@@ -27,6 +31,24 @@ env/
 *.key
 *.crt
 secrets.json
+
+# Service-account / credential files
+*-key.json
+*credentials*.json
+serviceAccount*.json
+*.p12
+
+# Android / Flutter signing material
+key.properties
+*.jks
+*.keystore
+
+# ─── Local-Only Docs & AI Harness ─────────────────────────────────────────────
+# Also present in .git/info/exclude, but that file is never cloned — these
+# entries are what protect these paths on any other checkout.
+.sensitive-docs/
+code-agent/
+.claude/
 
 # ─── OS Artifacts ─────────────────────────────────────────────────────────────
 .DS_Store

@@ -76,6 +76,56 @@ def _create_evidence_span(line: Line, image_id: str) -> EvidenceSpan:
     )
 
 
+def _assign_first_match(
+    extracted: Dict[Field, Declaration],
+    field: Field,
+    normalised_doc: NormalisedDocument,
+    line_lookup: Dict[str, Tuple[Line, str]],
+    parse_fn,
+    *,
+    alias_key: Optional[str] = None,
+    pattern_confidence: float = 0.90,
+    alias_confidence: float = 0.98,
+) -> None:
+    """
+    Scans normalised lines in order and records the first successful parse as a FOUND
+    Declaration. When alias_key is given, a line carrying that alias is credited to
+    ALIAS_ANCHOR; otherwise extraction is PATTERN_ONLY at pattern_confidence.
+    """
+    for n_line in normalised_doc.lines:
+        line_obj, img_id = line_lookup.get(n_line.line_id, (None, ""))
+        if not line_obj:
+            continue
+        parsed_tuple = parse_fn(n_line.raw_text)
+        if not parsed_tuple:
+            continue
+
+        raw_val, parsed_val = parsed_tuple
+        if alias_key is not None:
+            method = (
+                ExtractionMethod.ALIAS_ANCHOR
+                if alias_key in n_line.matched_aliases
+                else ExtractionMethod.PATTERN_ONLY
+            )
+            confidence = alias_confidence if method == ExtractionMethod.ALIAS_ANCHOR else pattern_confidence
+        else:
+            method = ExtractionMethod.PATTERN_ONLY
+            confidence = pattern_confidence
+            parsed_val = None
+
+        extracted[field] = Declaration(
+            field=field,
+            status=ExtractionStatus.FOUND,
+            raw_value=raw_val,
+            parsed=parsed_val,
+            evidence=[_create_evidence_span(line_obj, img_id)],
+            ocr_confidence=line_obj.confidence,
+            extraction_confidence=confidence,
+            method=method,
+        )
+        return
+
+
 def extract_declarations(
     normalised_doc: NormalisedDocument,
     ocr_doc: OcrDocument,
@@ -103,67 +153,22 @@ def extract_declarations(
         )
 
     # 1. NET_QUANTITY (D1)
-    for n_line in normalised_doc.lines:
-        line_obj, img_id = line_lookup.get(n_line.line_id, (None, ""))
-        if not line_obj:
-            continue
-        parsed_qty_tuple = parse_quantity(n_line.raw_text)
-        if parsed_qty_tuple:
-            raw_val, parsed_qty = parsed_qty_tuple
-            method = ExtractionMethod.ALIAS_ANCHOR if "NET_QUANTITY" in n_line.matched_aliases else ExtractionMethod.PATTERN_ONLY
-            extracted[Field.NET_QUANTITY] = Declaration(
-                field=Field.NET_QUANTITY,
-                status=ExtractionStatus.FOUND,
-                raw_value=raw_val,
-                parsed=parsed_qty,
-                evidence=[_create_evidence_span(line_obj, img_id)],
-                ocr_confidence=line_obj.confidence,
-                extraction_confidence=0.98 if method == ExtractionMethod.ALIAS_ANCHOR else 0.90,
-                method=method,
-            )
-            break
+    _assign_first_match(
+        extracted, Field.NET_QUANTITY, normalised_doc, line_lookup, parse_quantity,
+        alias_key="NET_QUANTITY", pattern_confidence=0.90,
+    )
 
     # 2. RETAIL_SALE_PRICE (D2)
-    for n_line in normalised_doc.lines:
-        line_obj, img_id = line_lookup.get(n_line.line_id, (None, ""))
-        if not line_obj:
-            continue
-        parsed_price_tuple = parse_price(n_line.raw_text)
-        if parsed_price_tuple:
-            raw_val, parsed_price = parsed_price_tuple
-            method = ExtractionMethod.ALIAS_ANCHOR if "RETAIL_SALE_PRICE" in n_line.matched_aliases else ExtractionMethod.PATTERN_ONLY
-            extracted[Field.RETAIL_SALE_PRICE] = Declaration(
-                field=Field.RETAIL_SALE_PRICE,
-                status=ExtractionStatus.FOUND,
-                raw_value=raw_val,
-                parsed=parsed_price,
-                evidence=[_create_evidence_span(line_obj, img_id)],
-                ocr_confidence=line_obj.confidence,
-                extraction_confidence=0.98 if method == ExtractionMethod.ALIAS_ANCHOR else 0.90,
-                method=method,
-            )
-            break
+    _assign_first_match(
+        extracted, Field.RETAIL_SALE_PRICE, normalised_doc, line_lookup, parse_price,
+        alias_key="RETAIL_SALE_PRICE", pattern_confidence=0.90,
+    )
 
     # 3. DATE_OF_MANUFACTURE_PACKING_IMPORT (D3)
-    for n_line in normalised_doc.lines:
-        line_obj, img_id = line_lookup.get(n_line.line_id, (None, ""))
-        if not line_obj:
-            continue
-        parsed_date_tuple = parse_date(n_line.raw_text)
-        if parsed_date_tuple:
-            raw_val, parsed_date = parsed_date_tuple
-            method = ExtractionMethod.ALIAS_ANCHOR if "DATE_OF_MANUFACTURE_PACKING_IMPORT" in n_line.matched_aliases else ExtractionMethod.PATTERN_ONLY
-            extracted[Field.DATE_OF_MANUFACTURE_PACKING_IMPORT] = Declaration(
-                field=Field.DATE_OF_MANUFACTURE_PACKING_IMPORT,
-                status=ExtractionStatus.FOUND,
-                raw_value=raw_val,
-                parsed=parsed_date,
-                evidence=[_create_evidence_span(line_obj, img_id)],
-                ocr_confidence=line_obj.confidence,
-                extraction_confidence=0.98 if method == ExtractionMethod.ALIAS_ANCHOR else 0.88,
-                method=method,
-            )
-            break
+    _assign_first_match(
+        extracted, Field.DATE_OF_MANUFACTURE_PACKING_IMPORT, normalised_doc, line_lookup, parse_date,
+        alias_key="DATE_OF_MANUFACTURE_PACKING_IMPORT", pattern_confidence=0.88,
+    )
 
     # 4. ADDRESS FIELDS: MANUFACTURER, PACKER, IMPORTER (D4)
     # Collect candidate lines for address blocks
@@ -318,44 +323,16 @@ def extract_declarations(
                 break
 
     # 8. COMMODITY_DIMENSIONS (D5)
-    for n_line in normalised_doc.lines:
-        line_obj, img_id = line_lookup.get(n_line.line_id, (None, ""))
-        if not line_obj:
-            continue
-        dim_tuple = parse_commodity_dimensions(line_obj.raw_text)
-        if dim_tuple:
-            raw_val, formatted_dim = dim_tuple
-            extracted[Field.COMMODITY_DIMENSIONS] = Declaration(
-                field=Field.COMMODITY_DIMENSIONS,
-                status=ExtractionStatus.FOUND,
-                raw_value=raw_val,
-                parsed=None,
-                evidence=[_create_evidence_span(line_obj, img_id)],
-                ocr_confidence=line_obj.confidence,
-                extraction_confidence=0.92,
-                method=ExtractionMethod.PATTERN_ONLY,
-            )
-            break
+    _assign_first_match(
+        extracted, Field.COMMODITY_DIMENSIONS, normalised_doc, line_lookup,
+        parse_commodity_dimensions, pattern_confidence=0.92,
+    )
 
     # 9. PIECE_COUNT (D5)
-    for n_line in normalised_doc.lines:
-        line_obj, img_id = line_lookup.get(n_line.line_id, (None, ""))
-        if not line_obj:
-            continue
-        pc_tuple = parse_piece_count(line_obj.raw_text)
-        if pc_tuple:
-            raw_val, count_val = pc_tuple
-            extracted[Field.PIECE_COUNT] = Declaration(
-                field=Field.PIECE_COUNT,
-                status=ExtractionStatus.FOUND,
-                raw_value=raw_val,
-                parsed=None,
-                evidence=[_create_evidence_span(line_obj, img_id)],
-                ocr_confidence=line_obj.confidence,
-                extraction_confidence=0.92,
-                method=ExtractionMethod.PATTERN_ONLY,
-            )
-            break
+    _assign_first_match(
+        extracted, Field.PIECE_COUNT, normalised_doc, line_lookup,
+        parse_piece_count, pattern_confidence=0.92,
+    )
 
     # 10. USABLE_SHEET_COUNT & SHEET_DIMENSIONS (D5)
     for n_line in normalised_doc.lines:

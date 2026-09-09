@@ -9,7 +9,7 @@ class ProcessingScreen extends StatefulWidget {
   final CaptureContext? captureContext;
   final Uint8List? pdpBytes;
   final Uint8List? backBytes;
-  final Uint8List? sideBytes;
+  final List<Uint8List> sideImages;
   final String? existingInspectionId;
 
   const ProcessingScreen({
@@ -17,7 +17,7 @@ class ProcessingScreen extends StatefulWidget {
     this.captureContext,
     this.pdpBytes,
     this.backBytes,
-    this.sideBytes,
+    this.sideImages = const [],
     this.existingInspectionId,
   });
 
@@ -67,7 +67,7 @@ class _ProcessingScreenState extends State<ProcessingScreen> {
         context: widget.captureContext!,
         pdpBytes: widget.pdpBytes!,
         backBytes: widget.backBytes!,
-        sideBytes: widget.sideBytes,
+        sideImages: widget.sideImages,
       );
 
       if (!mounted) return;

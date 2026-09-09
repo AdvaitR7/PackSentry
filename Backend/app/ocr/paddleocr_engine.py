@@ -21,7 +21,7 @@ class PaddleOcrAdapter:
     """Automatic local OCR fallback: GPU-first with bounded memory, CPU fallback on failure."""
 
     engine_name = "paddleocr"
-    engine_version = "3.x"
+    engine_version = "2.x"
 
     def __init__(self, lang: str = "hi", use_gpu: bool = True, gpu_mem: int = GPU_MEM_MB):
         self.lang = lang

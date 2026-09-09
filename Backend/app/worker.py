@@ -4,9 +4,9 @@ Single-Capacity Background Pipeline Worker (ADR-0007, ADR-0009, ADR-0013).
 Orchestrates the 8-stage Legal Metrology inspection pipeline:
 1. QUEUED: Job enqueued, stored in scratch disk and Postgres.
 2. PREPROCESSING: EXIF orientation, 1600px longest-edge resize, transform matrix.
-3. OCR: Cloud Vision primary with bounded timeout & automatic PaddleOCR fallback.
+3. OCR: Qwen2.5-VL primary with sequential PaddleOCR and Cloud Vision fallbacks.
 4. EXTRACTING: Normalisation, alias matching, D1-D6 deterministic parsers.
-5. VLM INTERPRETATION (Selective D7): Pre-warmed Qwen2.5-VL for unlocated fields under LOW_CONFIDENCE taint cap.
+5. VLM INTERPRETATION (Selective D7): Qwen field recovery only when primary OCR used another engine.
 6. EVALUATING: 23 statutory rules evaluation with absence & provenance gates.
 7. PERSISTING: Private Supabase Storage upload, signed URL minting, Postgres snapshot write, scratch purge.
 8. COMPLETE: Final immutable InspectionResponse rendered.
@@ -112,6 +112,10 @@ class InFlightJobRegistry:
         """Synchronous read for ultra-low-latency (<1ms) API handlers."""
         return self._jobs.get(inspection_id)
 
+    def snapshot(self) -> List[JobState]:
+        """Returns a snapshot of in-memory jobs for offline history listing."""
+        return list(self._jobs.values())
+
 
 class InspectionWorker:
     """Bounded single-capacity background execution worker."""
@@ -194,6 +198,12 @@ class InspectionWorker:
                     cleanup_scratch_dir(inspection_id)
                 self.queue.task_done()
 
+    async def _advance_stage(self, inspection_id: str, status: InspectionStatus, message: str) -> None:
+        """Publishes a stage transition to the in-memory registry and the DB checkpoint."""
+        await self.registry.update_stage(inspection_id, status, message)
+        async with acquire_connection() as conn:
+            await inspection_repo.update_stage_checkpoint(conn, inspection_id, status.value)
+
     async def _execute_pipeline(self, inspection_id: str) -> None:
         """Executes the complete end-to-end statutory inspection pipeline."""
         scratch_dir = get_scratch_dir(inspection_id)
@@ -213,13 +223,13 @@ class InspectionWorker:
         # ---------------------------------------------------------------------
         # Stage 1: PREPROCESSING (EXIF, 1600px resize, Transform calculation)
         # ---------------------------------------------------------------------
-        await self.registry.update_stage(inspection_id, InspectionStatus.PREPROCESSING, "Normalizing EXIF orientation and scaling images")
-        async with acquire_connection() as conn:
-            await inspection_repo.update_stage_checkpoint(conn, inspection_id, "PREPROCESSING")
+        await self._advance_stage(inspection_id, InspectionStatus.PREPROCESSING, "Normalizing EXIF orientation and scaling images")
 
-        preprocessed_panels: Dict[PanelRole, Dict[str, Any]] = {}
-        for role_str, file_info in manifest.items():
-            role = PanelRole(role_str)
+        # The manifest is an ordered list, not a role-keyed map: several SIDE
+        # panels share one role, and their order sets extraction precedence.
+        preprocessed_panels: List[Dict[str, Any]] = []
+        for file_info in manifest:
+            role = PanelRole(file_info["role"])
             raw_path = scratch_dir / file_info["filename"]
             with open(raw_path, "rb") as f_in:
                 raw_bytes = f_in.read()
@@ -236,12 +246,16 @@ class InspectionWorker:
             transform = processed.transform
 
             # Save analysis image to scratch
-            analysis_filename = f"{role.value.lower()}_analysis.jpg"
+            key = file_info["slot_key"]
+            analysis_filename = f"{key}_analysis.jpg"
             analysis_path = scratch_dir / analysis_filename
             with open(analysis_path, "wb") as f_out:
                 f_out.write(analysis_bytes)
 
-            preprocessed_panels[role] = {
+            preprocessed_panels.append({
+                "role": role,
+                "seq": file_info["seq"],
+                "slot_key": key,
                 "image_id": file_info["image_id"],
                 "raw_bytes": raw_bytes,
                 "analysis_bytes": analysis_bytes,
@@ -253,22 +267,26 @@ class InspectionWorker:
                 "original_filename": file_info["filename"],
                 "analysis_filename": analysis_filename,
                 "sha256": file_info["sha256"],
-            }
+            })
 
         # ---------------------------------------------------------------------
-        # Stage 2: OCR (Cloud Vision primary -> automatic PaddleOCR fallback)
+        # Stage 2: OCR (Sequential Priority: Qwen2.5-VL -> PaddleOCR -> Cloud Vision)
         # ---------------------------------------------------------------------
-        await self.registry.update_stage(inspection_id, InspectionStatus.OCR, "Detecting package text and calculating coordinate mappings")
-        async with acquire_connection() as conn:
-            await inspection_repo.update_stage_checkpoint(conn, inspection_id, "OCR")
+        await self._advance_stage(inspection_id, InspectionStatus.OCR, "Detecting package text sequentially across panels")
 
         image_slots: List[ImageSlot] = []
         engines_used: List[str] = []
 
-        for role, panel in preprocessed_panels.items():
+        total_panels = len(preprocessed_panels)
+        for idx, panel in enumerate(preprocessed_panels, start=1):
+            role_val = panel["role"].value
+            msg = f"Running OCR on panel {idx}/{total_panels} ({role_val})"
+            await self._advance_stage(inspection_id, InspectionStatus.OCR, msg)
+            logger.info("Inspection %s: %s", inspection_id, msg)
+
             slot, engine_used = await self.ocr_router.recognize_panel(
                 analysis_bytes=panel["analysis_bytes"],
-                role=role,
+                role=panel["role"],
                 image_id=panel["image_id"],
                 analysis_width=panel["ana_w"],
                 analysis_height=panel["ana_h"],
@@ -279,7 +297,7 @@ class InspectionWorker:
             image_slots.append(slot)
             engines_used.append(engine_used)
 
-        primary_ocr_engine = engines_used[0] if engines_used else "google_cloud_vision"
+        primary_ocr_engine = engines_used[0] if engines_used else "qwen2.5vl"
         ocr_doc = OcrDocument(
             ocr_engine=primary_ocr_engine,
             ocr_version="v1",
@@ -289,21 +307,22 @@ class InspectionWorker:
         # ---------------------------------------------------------------------
         # Stage 3: EXTRACTING (Normalisation + Deterministic Parsers D1-D6)
         # ---------------------------------------------------------------------
-        await self.registry.update_stage(inspection_id, InspectionStatus.EXTRACTING, "Extracting statutory declarations and validating SI units")
-        async with acquire_connection() as conn:
-            await inspection_repo.update_stage_checkpoint(conn, inspection_id, "EXTRACTING")
+        await self._advance_stage(inspection_id, InspectionStatus.EXTRACTING, "Extracting statutory declarations and validating SI units")
 
         norm_doc = build_normalised_document(ocr_doc)
         declaration_set = extract_declarations(norm_doc, ocr_doc, capture_ctx)
 
-        # Selective VLM Fallback (D7) for critical missing declarations
-        critical_fields = [Field.NET_QUANTITY, Field.RETAIL_SALE_PRICE]
-        if await self.vlm_interpreter.is_reachable():
+        # Selective VLM Fallback (D7) only when Qwen did not serve as primary OCR
+        # so primary Qwen OCR remains authoritative without unnecessary re-inference.
+        if "qwen2.5vl" not in engines_used and await self.vlm_interpreter.is_reachable():
+            critical_fields = [Field.NET_QUANTITY, Field.RETAIL_SALE_PRICE]
             for crit_field in critical_fields:
                 existing_decl = next((d for d in declaration_set.declarations if d.field == crit_field), None)
                 if existing_decl is None or existing_decl.status.value != "FOUND":
-                    # Query VLM using PDP image
-                    pdp_panel = preprocessed_panels.get(PanelRole.PDP)
+                    pdp_panel = next(
+                        (p for p in preprocessed_panels if p["role"] == PanelRole.PDP),
+                        None,
+                    )
                     if pdp_panel:
                         vlm_decl = await self.vlm_interpreter.interpret_field(
                             field=crit_field,
@@ -318,9 +337,7 @@ class InspectionWorker:
         # ---------------------------------------------------------------------
         # Stage 4: EVALUATING (Phase 2 23-Rule Statutory Engine)
         # ---------------------------------------------------------------------
-        await self.registry.update_stage(inspection_id, InspectionStatus.EVALUATING, "Adjudicating Legal Metrology compliance across 23 statutory rules")
-        async with acquire_connection() as conn:
-            await inspection_repo.update_stage_checkpoint(conn, inspection_id, "EVALUATING")
+        await self._advance_stage(inspection_id, InspectionStatus.EVALUATING, "Adjudicating Legal Metrology compliance across 23 statutory rules")
 
         scan_date_val = capture_ctx.captured_at.date() if isinstance(capture_ctx.captured_at, datetime) else date.today()
         prod_ctx = ProductContext(
@@ -338,20 +355,20 @@ class InspectionWorker:
         # ---------------------------------------------------------------------
         # Stage 5: PERSISTING (Storage upload, signed URLs, DB transaction)
         # ---------------------------------------------------------------------
-        await self.registry.update_stage(inspection_id, InspectionStatus.PERSISTING, "Saving evidence snapshots and minting verification URLs")
-        async with acquire_connection() as conn:
-            await inspection_repo.update_stage_checkpoint(conn, inspection_id, "PERSISTING")
+        await self._advance_stage(inspection_id, InspectionStatus.PERSISTING, "Saving evidence snapshots and minting verification URLs")
 
         completed_at = datetime.now(timezone.utc)
         image_infos: List[InspectionImageInfo] = []
         db_image_records: List[Dict[str, Any]] = []
 
-        for role, panel in preprocessed_panels.items():
-            orig_path = f"{inspection_id}/{role.value.lower()}_original.jpg"
+        for panel in preprocessed_panels:
+            role = panel["role"]
+            key = panel["slot_key"]
+            orig_path = f"{inspection_id}/{key}_original.jpg"
             ana_path = f"{inspection_id}/{panel['analysis_filename']}"
 
-            orig_url = f"/v1/inspections/{inspection_id}/images/{role.value.lower()}/original"
-            ana_url = f"/v1/inspections/{inspection_id}/images/{role.value.lower()}/analysis"
+            orig_url = f"/v1/inspections/{inspection_id}/images/{key}/original"
+            ana_url = f"/v1/inspections/{inspection_id}/images/{key}/analysis"
 
             # Upload to private Supabase Storage if configured
             if is_storage_configured():
@@ -382,6 +399,7 @@ class InspectionWorker:
                 "id": panel["image_id"],
                 "inspection_id": inspection_id,
                 "role": role.value,
+                "seq": panel["seq"],
                 "storage_path": orig_path,
                 "sha256": panel["sha256"],
                 "width": panel["orig_w"],

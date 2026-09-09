@@ -1,12 +1,8 @@
 """
-OCR Router and Failover Orchestrator (C1 per ADR-0004).
+OCR Router and Failover Orchestrator.
 
-Orchestrates primary OCR (Google Cloud Vision) and local automatic fallback (PaddleOCR):
-- Calls Cloud Vision first on every panel.
-- On Cloud Vision timeout (3.5s), transport error, quota limit, missing credentials,
-  or open circuit breaker, automatically dispatches to PaddleOCR without failing.
-- Aggregates recognized ImageSlots into a unified OcrDocument.
-- Tracks source engine on OcrDocument so downstream stages remain truthful and explainable.
+Runs one OCR engine at a time for each panel in priority order:
+Qwen2.5-VL -> PaddleOCR -> Google Cloud Vision.
 """
 
 import logging
@@ -16,21 +12,24 @@ from lmpc_schema import ImageSlot, OcrDocument, PanelRole
 from app.preprocessing import ProcessedPanel
 from .cloud_vision import GoogleCloudVisionAdapter
 from .paddleocr_engine import PaddleOcrAdapter
-from .protocol import CircuitBreakerOpenError, OcrEngine, OcrEngineError
+from .protocol import OcrEngine, OcrEngineError
+from .qwen_engine import QwenOcrAdapter
 
 logger = logging.getLogger("packsentry.ocr.router")
 
 
 class OcrRouter:
-    """Manages primary Cloud Vision execution and seamless PaddleOCR fallback."""
+    """Runs Qwen first, then PaddleOCR, then Cloud Vision, one engine at a time."""
 
     def __init__(
         self,
         primary: Optional[OcrEngine] = None,
         fallback: Optional[OcrEngine] = None,
+        tertiary: Optional[OcrEngine] = None,
     ):
-        self.primary = primary or GoogleCloudVisionAdapter()
+        self.primary = primary or QwenOcrAdapter()
         self.fallback = fallback or PaddleOcrAdapter()
+        self.tertiary = tertiary or GoogleCloudVisionAdapter()
 
     async def recognize_panel(
         self,
@@ -43,42 +42,35 @@ class OcrRouter:
         original_height: int,
         transform,
     ) -> Tuple[ImageSlot, str]:
-        """
-        Attempts primary OCR; falls back to secondary OCR on any error or circuit trip.
-        Returns (ImageSlot, engine_name_used).
-        """
-        try:
-            slot = await self.primary.recognize_panel(
-                analysis_bytes=analysis_bytes,
-                role=role,
-                image_id=image_id,
-                analysis_width=analysis_width,
-                analysis_height=analysis_height,
-                original_width=original_width,
-                original_height=original_height,
-                transform=transform,
-            )
-            return slot, self.primary.engine_name
-        except (CircuitBreakerOpenError, OcrEngineError, Exception) as exc:
-            logger.warning(
-                "Primary OCR '%s' unavailable (%s). Falling back automatically to '%s'.",
-                self.primary.engine_name,
-                exc,
-                self.fallback.engine_name,
-            )
+        """Tries each configured OCR engine sequentially and returns the first success."""
+        kwargs = {
+            "analysis_bytes": analysis_bytes,
+            "role": role,
+            "image_id": image_id,
+            "analysis_width": analysis_width,
+            "analysis_height": analysis_height,
+            "original_width": original_width,
+            "original_height": original_height,
+            "transform": transform,
+        }
+        engines = [self.primary, self.fallback, self.tertiary]
+        failures = []
 
-            # Local fallback execution
-            slot = await self.fallback.recognize_panel(
-                analysis_bytes=analysis_bytes,
-                role=role,
-                image_id=image_id,
-                analysis_width=analysis_width,
-                analysis_height=analysis_height,
-                original_width=original_width,
-                original_height=original_height,
-                transform=transform,
-            )
-            return slot, self.fallback.engine_name
+        for index, engine in enumerate(engines):
+            try:
+                slot = await engine.recognize_panel(**kwargs)
+                return slot, engine.engine_name
+            except Exception as exc:
+                failures.append(f"{engine.engine_name}: {exc}")
+                if index < len(engines) - 1:
+                    logger.warning(
+                        "OCR '%s' unavailable (%s). Trying '%s'.",
+                        engine.engine_name,
+                        exc,
+                        engines[index + 1].engine_name,
+                    )
+
+        raise OcrEngineError("All OCR engines failed: " + "; ".join(failures))
 
     async def recognize_inspection(
         self,

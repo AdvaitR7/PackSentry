@@ -5,6 +5,7 @@ Includes ADR-0011 legal currency implementation of Rule 13(5)(ii) per G.S.R. 779
 
 import re
 from datetime import date
+from typing import List
 from lmpc_schema import (
     DeclarationSet,
     DimensionKind,

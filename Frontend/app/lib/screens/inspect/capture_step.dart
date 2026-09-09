@@ -1,4 +1,3 @@
-import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
@@ -11,16 +10,46 @@ class CaptureStep extends StatelessWidget {
 
   Future<void> _captureFromCamera(
     BuildContext context,
+    String panelLabel,
     Function(Uint8List) onBytesCaptured,
   ) async {
-    final imagePath = await Navigator.push<String>(
-      context,
-      MaterialPageRoute(builder: (_) => const CameraScreen()),
-    );
+    final messenger = ScaffoldMessenger.of(context);
 
-    if (imagePath == null) return;
-    final bytes = await File(imagePath).readAsBytes();
-    onBytesCaptured(bytes);
+    try {
+      final bytes = await Navigator.push<Uint8List>(
+        context,
+        MaterialPageRoute(builder: (_) => const CameraScreen()),
+      );
+
+      // Inspector cancelled the capture.
+      if (bytes == null) return;
+
+      if (bytes.isEmpty) {
+        messenger.showSnackBar(
+          SnackBar(
+            content: Text('$panelLabel photo was empty — please retake it.'),
+            backgroundColor: Colors.red.shade700,
+          ),
+        );
+        return;
+      }
+
+      onBytesCaptured(bytes);
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text('$panelLabel photo attached.'),
+          backgroundColor: Colors.green.shade700,
+          duration: const Duration(seconds: 2),
+        ),
+      );
+    } catch (e) {
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text('Could not attach $panelLabel photo: $e'),
+          backgroundColor: Colors.red.shade700,
+        ),
+      );
+    }
   }
 
   Widget _panelCard({
@@ -136,7 +165,7 @@ class CaptureStep extends StatelessWidget {
               subtitle: 'Front label containing Net Quantity and commodity name.',
               isRequired: true,
               imageBytes: controller.pdpBytes,
-              onCapture: () => _captureFromCamera(context, (bytes) => controller.setPdpBytes(bytes)),
+              onCapture: () => _captureFromCamera(context, 'PDP', (bytes) => controller.setPdpBytes(bytes)),
               onRemove: () => controller.setPdpBytes(null),
             ),
             _panelCard(
@@ -145,18 +174,56 @@ class CaptureStep extends StatelessWidget {
               subtitle: 'Information panel declaring MRP, Date, Manufacturer, and Consumer Care.',
               isRequired: true,
               imageBytes: controller.backBytes,
-              onCapture: () => _captureFromCamera(context, (bytes) => controller.setBackBytes(bytes)),
+              onCapture: () => _captureFromCamera(context, 'Back', (bytes) => controller.setBackBytes(bytes)),
               onRemove: () => controller.setBackBytes(null),
             ),
-            _panelCard(
-              context: context,
-              title: 'Side Panel (SIDE)',
-              subtitle: 'Supplementary panel declarations if applicable.',
-              isRequired: false,
-              imageBytes: controller.sideBytes,
-              onCapture: () => _captureFromCamera(context, (bytes) => controller.setSideBytes(bytes)),
-              onRemove: () => controller.setSideBytes(null),
-            ),
+            // Additional panels — up to InspectionWizardController.maxSideImages.
+            for (var i = 0; i < controller.sideImages.length; i++)
+              _panelCard(
+                context: context,
+                title: 'Additional Panel ${i + 1} (SIDE)',
+                subtitle: 'Supplementary panel declarations if applicable.',
+                isRequired: false,
+                imageBytes: controller.sideImages[i],
+                onCapture: () => _captureFromCamera(
+                  context,
+                  'Additional panel ${i + 1}',
+                  (bytes) => controller.replaceSideImageAt(i, bytes),
+                ),
+                onRemove: () => controller.removeSideImageAt(i),
+              ),
+
+            if (controller.canAddSideImage)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 16),
+                child: SizedBox(
+                  width: double.infinity,
+                  height: 52,
+                  child: OutlinedButton.icon(
+                    icon: const Icon(Icons.add_a_photo_outlined),
+                    label: Text(
+                      controller.sideImages.isEmpty
+                          ? 'Add Additional Panel (Optional)'
+                          : 'Add Another Panel '
+                              '(${controller.sideImages.length}/${InspectionWizardController.maxSideImages})',
+                    ),
+                    onPressed: () => _captureFromCamera(
+                      context,
+                      'Additional panel ${controller.sideImages.length + 1}',
+                      (bytes) => controller.addSideImage(bytes),
+                    ),
+                  ),
+                ),
+              )
+            else
+              const Padding(
+                padding: EdgeInsets.only(bottom: 16),
+                child: Text(
+                  'Maximum of '
+                  '${InspectionWizardController.maxSideImages} additional panels attached.',
+                  style: TextStyle(color: Colors.grey, fontSize: 13),
+                ),
+              ),
             const SizedBox(height: 8),
 
             // All Images Captured Toggle (ADR-0005 Absence Evidence Gate)

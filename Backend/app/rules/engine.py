@@ -10,7 +10,7 @@ Coordinates:
 - Overall inspection verdict aggregation
 """
 
-from typing import List, Tuple
+from typing import List, Optional, Tuple
 from lmpc_schema import (
     ApplicabilityResult,
     ApplicabilityStatus,
@@ -52,6 +52,37 @@ SEVERITY_ORDER = [
 ]
 
 
+def _make_result(
+    spec: RuleSpec,
+    verdict: InternalVerdict,
+    ui_bucket: UiBucket,
+    reason_code: str,
+    message: str,
+    applicability: ApplicabilityResult,
+    *,
+    observed: Optional[str] = None,
+    expected: Optional[str] = None,
+    evidence: Optional[List] = None,
+    confidence: Optional[ConfidenceSet] = None,
+) -> RuleResult:
+    """Builds a RuleResult, filling the registry-owned fields from the spec."""
+    return RuleResult(
+        rule_id=spec.rule_id,
+        provision=spec.citation.provision,
+        title=spec.title,
+        verdict=verdict,
+        ui_bucket=ui_bucket,
+        reason_code=reason_code,
+        message=message,
+        observed=observed,
+        expected=expected,
+        evidence=evidence if evidence is not None else [],
+        confidence=confidence or ConfidenceSet(ocr=1.0, extraction=1.0, rule=1.0),
+        applicability=applicability,
+        citation=spec.citation,
+    )
+
+
 def evaluate_single_rule(
     spec: RuleSpec,
     declarations: DeclarationSet,
@@ -60,24 +91,18 @@ def evaluate_single_rule(
     """Evaluates one RuleSpec against the provided declarations and product context."""
     # 1. Check if rule is deferred (ADR-0012)
     if spec.deferred:
-        verdict = InternalVerdict.NOT_EVALUATED
-        ui_bucket = UiBucket.NOT_EVALUATED
-        return RuleResult(
-            rule_id=spec.rule_id,
-            provision=spec.citation.provision,
-            title=spec.title,
-            verdict=verdict,
-            ui_bucket=ui_bucket,
-            reason_code=spec.deferred_reason_code or "RULE_DEFERRED",
-            message=spec.deferred_message or "Rule capability is deferred in this demo scope.",
-            confidence=ConfidenceSet(ocr=1.0, extraction=1.0, rule=1.0),
-            applicability=ApplicabilityResult(
+        return _make_result(
+            spec,
+            InternalVerdict.NOT_EVALUATED,
+            UiBucket.NOT_EVALUATED,
+            spec.deferred_reason_code or "RULE_DEFERRED",
+            spec.deferred_message or "Rule capability is deferred in this demo scope.",
+            ApplicabilityResult(
                 status=ApplicabilityStatus.NOT_APPLICABLE,
                 gate=None,
                 reason_code=spec.deferred_reason_code,
                 message=spec.deferred_message,
             ),
-            citation=spec.citation,
         )
 
     # 2. Check Applicability Chain
@@ -85,50 +110,34 @@ def evaluate_single_rule(
 
     # Special handling for Rule 3 contested ambiguity (ADR-0006)
     if special_flag == "RULE_3_AMBIGUOUS":
-        verdict = InternalVerdict.INDETERMINATE
-        ui_bucket = UiBucket.MANUAL_REVIEW
-        return RuleResult(
-            rule_id=spec.rule_id,
-            provision=spec.citation.provision,
-            title=spec.title,
-            verdict=verdict,
-            ui_bucket=ui_bucket,
-            reason_code="RULE_3_AMBIGUOUS",
-            message=app_res.message or "Rule 3 boundary is contested.",
-            confidence=ConfidenceSet(ocr=1.0, extraction=1.0, rule=1.0),
-            applicability=app_res,
-            citation=spec.citation,
+        return _make_result(
+            spec,
+            InternalVerdict.INDETERMINATE,
+            UiBucket.MANUAL_REVIEW,
+            "RULE_3_AMBIGUOUS",
+            app_res.message or "Rule 3 boundary is contested.",
+            app_res,
         )
 
     if app_res.status == ApplicabilityStatus.NOT_APPLICABLE:
-        verdict = InternalVerdict.NOT_APPLICABLE
-        ui_bucket = UiBucket.NOT_APPLICABLE
-        return RuleResult(
-            rule_id=spec.rule_id,
-            provision=spec.citation.provision,
-            title=spec.title,
-            verdict=verdict,
-            ui_bucket=ui_bucket,
-            reason_code=app_res.reason_code or "NOT_APPLICABLE",
-            message=app_res.message or "Rule is not applicable to this inspection context.",
-            confidence=ConfidenceSet(ocr=1.0, extraction=1.0, rule=1.0),
-            applicability=app_res,
-            citation=spec.citation,
+        return _make_result(
+            spec,
+            InternalVerdict.NOT_APPLICABLE,
+            UiBucket.NOT_APPLICABLE,
+            app_res.reason_code or "NOT_APPLICABLE",
+            app_res.message or "Rule is not applicable to this inspection context.",
+            app_res,
         )
 
     # 3. Applicable rule: execute core evaluation function
     if not spec.evaluate_fn:
-        return RuleResult(
-            rule_id=spec.rule_id,
-            provision=spec.citation.provision,
-            title=spec.title,
-            verdict=InternalVerdict.UNVERIFIABLE,
-            ui_bucket=UiBucket.MANUAL_REVIEW,
-            reason_code="EVALUATION_FUNCTION_MISSING",
-            message="No evaluation routine registered for this rule.",
-            confidence=ConfidenceSet(ocr=1.0, extraction=1.0, rule=1.0),
-            applicability=app_res,
-            citation=spec.citation,
+        return _make_result(
+            spec,
+            InternalVerdict.UNVERIFIABLE,
+            UiBucket.MANUAL_REVIEW,
+            "EVALUATION_FUNCTION_MISSING",
+            "No evaluation routine registered for this rule.",
+            app_res,
         )
 
     outcome: RuleOutcome = spec.evaluate_fn(declarations, context)
@@ -165,20 +174,17 @@ def evaluate_single_rule(
     ocr_c = outcome.ocr_confidence if outcome.ocr_confidence is not None else 1.0
     ext_c = outcome.extraction_confidence if outcome.extraction_confidence is not None else 1.0
 
-    return RuleResult(
-        rule_id=spec.rule_id,
-        provision=spec.citation.provision,
-        title=spec.title,
-        verdict=verdict,
-        ui_bucket=ui_bucket,
-        reason_code=reason_code,
-        message=message,
+    return _make_result(
+        spec,
+        verdict,
+        ui_bucket,
+        reason_code,
+        message,
+        app_res,
         observed=outcome.observed,
         expected=outcome.expected,
         evidence=outcome.evidence,
         confidence=ConfidenceSet(ocr=ocr_c, extraction=ext_c, rule=1.0),
-        applicability=app_res,
-        citation=spec.citation,
     )
 
 

@@ -36,6 +36,7 @@ from lmpc_schema import (
 
 from app.db.repositories import image_repo, inspection_repo, rule_result_repo
 from app.db.scratch import cleanup_scratch_dir, get_scratch_dir, stream_upload_to_scratch
+from app.panels import MAX_SIDE_PANELS, slot_key
 from app.db.session import acquire_connection
 from app.db.storage import is_configured as is_storage_configured, mint_signed_url
 
@@ -59,7 +60,11 @@ async def create_inspection(
     context: str = Form(..., description="Serialized CaptureContext JSON"),
     pdp: UploadFile = File(..., alias="PDP", description="Required Principal Display Panel image"),
     back: UploadFile = File(..., alias="BACK", description="Required Back Panel image"),
-    side: Optional[UploadFile] = File(None, alias="SIDE", description="Optional Side Panel image"),
+    sides: List[UploadFile] = File(
+        default_factory=list,
+        alias="SIDE",
+        description=f"Optional additional panel images, repeatable up to {MAX_SIDE_PANELS} times",
+    ),
     idempotency_key: Optional[str] = Header(None, alias="Idempotency-Key"),
 ):
     """
@@ -77,24 +82,44 @@ async def create_inspection(
             detail=f"Invalid 'context' JSON payload: {exc}",
         )
 
-    # 2. Stage files to Scratch Disk and compute in-flight hashes
+    # Reject an over-long SIDE list before anything touches scratch disk.
+    if len(sides) > MAX_SIDE_PANELS:
+        raise HTTPException(
+            status_code=422,
+            detail=(
+                f"At most {MAX_SIDE_PANELS} additional SIDE panels are accepted; "
+                f"{len(sides)} were supplied."
+            ),
+        )
+
+    # 2. Stage files to Scratch Disk and compute in-flight hashes.
+    #    Panel order is significant: extraction is first-match-wins across the
+    #    flattened cross-panel line list, so PDP outranks BACK, which outranks
+    #    the additional panels.
     temp_id = f"insp_{uuid4().hex[:12]}"
     scratch_dir = get_scratch_dir(temp_id)
 
+    uploads = [(PanelRole.PDP, 1, pdp), (PanelRole.BACK, 1, back)]
+    uploads += [(PanelRole.SIDE, seq, upload) for seq, upload in enumerate(sides, start=1)]
+
+    manifest: List[Dict[str, Any]] = []
     try:
-        # Stream PDP
-        pdp_path = scratch_dir / "pdp_original.jpg"
-        pdp_sha, pdp_w, pdp_h = await stream_upload_to_scratch(pdp, pdp_path)
-
-        # Stream BACK
-        back_path = scratch_dir / "back_original.jpg"
-        back_sha, back_w, back_h = await stream_upload_to_scratch(back, back_path)
-
-        # Stream SIDE if provided
-        side_sha, side_w, side_h = (None, None, None)
-        if side is not None:
-            side_path = scratch_dir / "side_original.jpg"
-            side_sha, side_w, side_h = await stream_upload_to_scratch(side, side_path)
+        for role, seq, upload in uploads:
+            key = slot_key(role, seq)
+            filename = f"{key}_original.jpg"
+            sha, width, height = await stream_upload_to_scratch(upload, scratch_dir / filename)
+            manifest.append(
+                {
+                    "role": role.value,
+                    "seq": seq,
+                    "slot_key": key,
+                    "filename": filename,
+                    "image_id": f"img_{uuid4().hex[:8]}",
+                    "sha256": sha,
+                    "width": width,
+                    "height": height,
+                }
+            )
 
     except HTTPException:
         cleanup_scratch_dir(temp_id)
@@ -104,8 +129,7 @@ async def create_inspection(
         raise HTTPException(status_code=422, detail=f"Failed to process image uploads: {exc}")
 
     # 3. Check Idempotency
-    all_shas = [pdp_sha, back_sha] + ([side_sha] if side_sha else [])
-    req_hash = _compute_request_hash(context, all_shas)
+    req_hash = _compute_request_hash(context, [entry["sha256"] for entry in manifest])
 
     async with acquire_connection() as conn:
         if conn and idempotency_key:
@@ -127,31 +151,6 @@ async def create_inspection(
                     )
 
     # 4. Save Context and Manifest to scratch directory for the worker
-    manifest = {
-        PanelRole.PDP.value: {
-            "filename": "pdp_original.jpg",
-            "image_id": f"img_{uuid4().hex[:8]}",
-            "sha256": pdp_sha,
-            "width": pdp_w,
-            "height": pdp_h,
-        },
-        PanelRole.BACK.value: {
-            "filename": "back_original.jpg",
-            "image_id": f"img_{uuid4().hex[:8]}",
-            "sha256": back_sha,
-            "width": back_w,
-            "height": back_h,
-        },
-    }
-    if side is not None:
-        manifest[PanelRole.SIDE.value] = {
-            "filename": "side_original.jpg",
-            "image_id": f"img_{uuid4().hex[:8]}",
-            "sha256": side_sha,
-            "width": side_w,
-            "height": side_h,
-        }
-
     with open(scratch_dir / "context.json", "w", encoding="utf-8") as f:
         json.dump(capture_ctx.model_dump(), f, default=str)
     with open(scratch_dir / "manifest.json", "w", encoding="utf-8") as f:
@@ -230,7 +229,8 @@ async def get_inspection(inspection_id: str, request: Request):
         images_data = await image_repo.get_images_for_inspection(conn, inspection_id)
         image_infos = []
         for img in images_data:
-            orig_url = f"/v1/inspections/{inspection_id}/images/{img['role'].lower()}/original"
+            key = slot_key(PanelRole(img["role"]), img.get("seq") or 1)
+            orig_url = f"/v1/inspections/{inspection_id}/images/{key}/original"
             if is_storage_configured():
                 signed = mint_signed_url(img["storage_path"], expires_in_seconds=120)
                 if signed:
@@ -298,15 +298,63 @@ async def get_inspection(inspection_id: str, request: Request):
 
 @router.get("")
 async def list_inspections(
+    request: Request,
     limit: int = Query(default=20, ge=1, le=100),
     cursor: Optional[datetime] = Query(default=None),
     status: Optional[str] = Query(default=None),
 ):
-    """Cursor-paginated inspection history."""
+    """
+    Cursor-paginated inspection history.
+
+    Falls back to the in-memory worker registry when Postgres is not configured
+    (offline demo mode) so this session's inspections are still listed.
+    """
     async with acquire_connection() as conn:
-        return await inspection_repo.list_inspections(
+        rows = await inspection_repo.list_inspections(
             conn=conn,
             limit=limit,
             cursor_created_at=cursor,
             status_filter=status,
         )
+
+    if rows:
+        return rows
+
+    worker = getattr(request.app.state, "worker", None)
+    if worker is None:
+        return []
+
+    return _list_inspections_from_registry(worker, limit=limit, status_filter=status)
+
+
+def _list_inspections_from_registry(worker, limit: int, status_filter: Optional[str]) -> List[Dict[str, Any]]:
+    """Renders in-memory job states in the same shape as the Postgres history rows."""
+    jobs = sorted(
+        worker.registry.snapshot(),
+        key=lambda job: job.created_at,
+        reverse=True,
+    )
+
+    results: List[Dict[str, Any]] = []
+    for job in jobs:
+        status_val = job.status.value
+        if status_filter and status_val != status_filter:
+            continue
+
+        result = job.result
+        results.append(
+            {
+                "id": job.inspection_id,
+                "status": status_val,
+                "overall": result.overall.value if result else None,
+                "overall_ui_bucket": result.overall_ui_bucket.value if result else None,
+                "summary": result.summary.model_dump() if result else None,
+                "context": result.context.model_dump() if result else None,
+                "created_at": job.created_at,
+                "completed_at": result.completed_at if result else None,
+            }
+        )
+        if len(results) >= limit:
+            break
+
+    return results
