@@ -3,14 +3,15 @@ LMPC OCR Package (Track C1 per ADR-0001, ADR-0004).
 
 Provides:
 - OcrEngine protocol
-- GoogleCloudVisionAdapter (primary, with circuit breaker & timeout)
-- PaddleOcrAdapter (automatic local fallback, GPU bounded -> CPU fallback)
-- OcrRouter (failover orchestration)
+- QwenOcrAdapter (primary local vision OCR)
+- PaddleOcrAdapter and GoogleCloudVisionAdapter fallbacks
+- OcrRouter (sequential failover orchestration)
 """
 
 from .cloud_vision import CircuitBreaker, CircuitState, GoogleCloudVisionAdapter
 from .paddleocr_engine import PaddleOcrAdapter
 from .protocol import CircuitBreakerOpenError, OcrEngine, OcrEngineError
+from .qwen_engine import QwenOcrAdapter
 from .router import OcrRouter
 from .vlm_interpreter import QwenVlmInterpreter
 
@@ -22,6 +23,7 @@ __all__ = [
     "CircuitState",
     "GoogleCloudVisionAdapter",
     "PaddleOcrAdapter",
+    "QwenOcrAdapter",
     "OcrRouter",
     "QwenVlmInterpreter",
 ]

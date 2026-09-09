@@ -17,7 +17,7 @@ import time
 from pathlib import Path
 
 import pytest
-from lmpc_schema import ImageSlot, PanelRole, Transform
+from lmpc_schema import ImageSlot, Line, PanelRole, Transform
 
 from app.ocr.cloud_vision import CircuitBreaker, CircuitState
 from app.ocr.paddleocr_engine import PaddleOcrAdapter
@@ -56,7 +56,17 @@ class FakeSuccessEngine:
             original_width=original_width,
             original_height=original_height,
             transform=transform,
-            lines=[],
+            lines=[
+                Line(
+                    line_id=f"{image_id}:l001",
+                    raw_text="Net Qty: 500 g",
+                    confidence=0.95,
+                    polygon_analysis=[],
+                    polygon_original=[],
+                    polygon_normalized=[],
+                    words=[],
+                )
+            ],
         )
 
 
@@ -154,6 +164,27 @@ async def test_router_falls_back_on_open_circuit_breaker():
         transform=Transform(),
     )
     assert engine_used == "fake_success_engine"
+
+
+@pytest.mark.asyncio
+async def test_router_uses_tertiary_when_primary_and_fallback_fail():
+    router = OcrRouter(
+        primary=FakeFailingEngine(),
+        fallback=FakeFailingEngine(),
+        tertiary=FakeSuccessEngine(),
+    )
+    slot, engine_used = await router.recognize_panel(
+        analysis_bytes=b"fake_bytes",
+        role=PanelRole.PDP,
+        image_id="img_tertiary",
+        analysis_width=1200,
+        analysis_height=1600,
+        original_width=3024,
+        original_height=4032,
+        transform=Transform(),
+    )
+    assert engine_used == "fake_success_engine"
+    assert slot.image_id == "img_tertiary"
 
 
 @pytest.mark.asyncio

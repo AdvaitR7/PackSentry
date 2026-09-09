@@ -4,9 +4,9 @@ Single-Capacity Background Pipeline Worker (ADR-0007, ADR-0009, ADR-0013).
 Orchestrates the 8-stage Legal Metrology inspection pipeline:
 1. QUEUED: Job enqueued, stored in scratch disk and Postgres.
 2. PREPROCESSING: EXIF orientation, 1600px longest-edge resize, transform matrix.
-3. OCR: Cloud Vision primary with bounded timeout & automatic PaddleOCR fallback.
+3. OCR: Qwen2.5-VL primary with sequential PaddleOCR and Cloud Vision fallbacks.
 4. EXTRACTING: Normalisation, alias matching, D1-D6 deterministic parsers.
-5. VLM INTERPRETATION (Selective D7): Pre-warmed Qwen2.5-VL for unlocated fields under LOW_CONFIDENCE taint cap.
+5. VLM INTERPRETATION (Selective D7): Qwen field recovery only when primary OCR used another engine.
 6. EVALUATING: 23 statutory rules evaluation with absence & provenance gates.
 7. PERSISTING: Private Supabase Storage upload, signed URL minting, Postgres snapshot write, scratch purge.
 8. COMPLETE: Final immutable InspectionResponse rendered.
@@ -270,14 +270,20 @@ class InspectionWorker:
             })
 
         # ---------------------------------------------------------------------
-        # Stage 2: OCR (Cloud Vision primary -> automatic PaddleOCR fallback)
+        # Stage 2: OCR (Sequential Priority: Qwen2.5-VL -> PaddleOCR -> Cloud Vision)
         # ---------------------------------------------------------------------
-        await self._advance_stage(inspection_id, InspectionStatus.OCR, "Detecting package text and calculating coordinate mappings")
+        await self._advance_stage(inspection_id, InspectionStatus.OCR, "Detecting package text sequentially across panels")
 
         image_slots: List[ImageSlot] = []
         engines_used: List[str] = []
 
-        for panel in preprocessed_panels:
+        total_panels = len(preprocessed_panels)
+        for idx, panel in enumerate(preprocessed_panels, start=1):
+            role_val = panel["role"].value
+            msg = f"Running OCR on panel {idx}/{total_panels} ({role_val})"
+            await self._advance_stage(inspection_id, InspectionStatus.OCR, msg)
+            logger.info("Inspection %s: %s", inspection_id, msg)
+
             slot, engine_used = await self.ocr_router.recognize_panel(
                 analysis_bytes=panel["analysis_bytes"],
                 role=panel["role"],
@@ -291,7 +297,7 @@ class InspectionWorker:
             image_slots.append(slot)
             engines_used.append(engine_used)
 
-        primary_ocr_engine = engines_used[0] if engines_used else "google_cloud_vision"
+        primary_ocr_engine = engines_used[0] if engines_used else "qwen2.5vl"
         ocr_doc = OcrDocument(
             ocr_engine=primary_ocr_engine,
             ocr_version="v1",
@@ -306,13 +312,13 @@ class InspectionWorker:
         norm_doc = build_normalised_document(ocr_doc)
         declaration_set = extract_declarations(norm_doc, ocr_doc, capture_ctx)
 
-        # Selective VLM Fallback (D7) for critical missing declarations
-        critical_fields = [Field.NET_QUANTITY, Field.RETAIL_SALE_PRICE]
-        if await self.vlm_interpreter.is_reachable():
+        # Selective VLM Fallback (D7) only when Qwen did not serve as primary OCR
+        # so primary Qwen OCR remains authoritative without unnecessary re-inference.
+        if "qwen2.5vl" not in engines_used and await self.vlm_interpreter.is_reachable():
+            critical_fields = [Field.NET_QUANTITY, Field.RETAIL_SALE_PRICE]
             for crit_field in critical_fields:
                 existing_decl = next((d for d in declaration_set.declarations if d.field == crit_field), None)
                 if existing_decl is None or existing_decl.status.value != "FOUND":
-                    # Query VLM using PDP image
                     pdp_panel = next(
                         (p for p in preprocessed_panels if p["role"] == PanelRole.PDP),
                         None,
