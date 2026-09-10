@@ -12,7 +12,7 @@ import httpx
 from lmpc_schema import CaptureContext, CommodityCategory, DimensionKind, ExtractionStatus, Field, ImportStatus, OcrDocument, PackageType, PanelRole, Transform
 from app.extraction.pipeline import extract_declarations
 from app.normalise import build_normalised_document
-from app.ocr.gemini_engine import GeminiFlashOcrAdapter
+from app.ocr.gemini_engine import GeminiFlashOcrAdapter, STRUCTURED_RESPONSE_SCHEMA
 from app.ocr.protocol import OcrEngineError
 from app.ocr.router import OcrRouter
 
@@ -382,6 +382,100 @@ def test_gemini_ocr_stamped_misaligned_info_parsing():
     assert date_decl.status == ExtractionStatus.FOUND
     assert date_decl.parsed.month == 6
     assert date_decl.parsed.year == 2025
+
+
+def test_gemini_reported_fields_reach_rule_6_evaluation():
+    from datetime import date
+    from app.rules import evaluate_single_rule, get_rule
+    from lmpc_schema import InternalVerdict, ProductContext
+
+    field_types = STRUCTURED_RESPONSE_SCHEMA["properties"]["regions"]["items"]["properties"]["field_type"]["enum"]
+    assert "manufacture_date" in field_types
+    assert "mrp_price" in field_types
+
+    response = json.dumps({
+        "product_summary": {
+            "brand": "GIZGA ESSENTIALS",
+            "product_name": "3-IN-1 SCREEN CLEANING KIT",
+            "variant": None,
+            "category": "household_product",
+        },
+        "regions": [
+            {
+                "field_type": "importer",
+                "label": "IMPORTED BY:",
+                "observed_text": "IMPORTED BY: IRIS TECH. G-1, DHARAM COMPLEX, PHASE-1, ANJUR MANKOLI ROAD, BHIWANDI-421302.",
+                "normalized_value": None,
+                "source_image_index": 0,
+                "bbox_2d": [160, 110, 205, 835],
+                "legibility": "clear",
+            },
+            {
+                "field_type": "manufacture_date",
+                "label": "MONTH & YEAR OF MANUFACTURING:",
+                "observed_text": "MONTH & YEAR OF MANUFACTURING: APRIL - 2026",
+                "normalized_value": "April 2026",
+                "source_image_index": 0,
+                "bbox_2d": [345, 110, 365, 675],
+                "legibility": "clear",
+            },
+            {
+                "field_type": "mrp_price",
+                "label": "MRP:",
+                "observed_text": "MRP: RS. 199.00 (INCL. OF ALL TAXES)",
+                "normalized_value": "199.00",
+                "source_image_index": 0,
+                "bbox_2d": [370, 110, 390, 560],
+                "legibility": "clear",
+            },
+        ],
+        "extraction_notes": [],
+    })
+
+    adapter = GeminiFlashOcrAdapter(api_key="test_mock_key")
+    slot = adapter._parse_response(
+        response, PanelRole.BACK, "img_back", 1000, 1000, 1000, 1000, Transform()
+    )
+    ocr_doc = OcrDocument(ocr_engine="gemini-2.5-flash", ocr_version="2.5", images=[slot])
+    capture_ctx = CaptureContext(
+        package_type=PackageType.RETAIL,
+        commodity_category=CommodityCategory.GENERAL,
+        import_status=ImportStatus.IMPORTED,
+        all_panels_captured=True,
+        inspector_id="test",
+        captured_at=datetime(2026, 9, 9),
+    )
+    declarations = extract_declarations(build_normalised_document(ocr_doc), ocr_doc, capture_ctx)
+
+    importer = next(d for d in declarations.declarations if d.field == Field.IMPORTER_NAME_ADDRESS)
+    manufacture_date = next(
+        d for d in declarations.declarations if d.field == Field.DATE_OF_MANUFACTURE_PACKING_IMPORT
+    )
+    mrp = next(d for d in declarations.declarations if d.field == Field.RETAIL_SALE_PRICE)
+
+    assert importer.status == ExtractionStatus.FOUND
+    assert importer.parsed.pin_code == "421302"
+    assert manufacture_date.status == ExtractionStatus.FOUND
+    assert (manufacture_date.parsed.month, manufacture_date.parsed.year) == (4, 2026)
+    assert mrp.status == ExtractionStatus.FOUND
+    assert mrp.parsed.amount == 199.00
+
+    product_ctx = ProductContext(
+        package_type=PackageType.RETAIL,
+        commodity_category=CommodityCategory.GENERAL,
+        import_status=ImportStatus.IMPORTED,
+        scan_date=date(2026, 9, 9),
+        ruleset_as_of=date(2026, 9, 9),
+    )
+    expected_outcomes = {
+        "R6_1_A_IDENTITY": "IDENTITY_AND_ADDRESS_COMPLIANT",
+        "R6_1_D_DATE": "MANUFACTURE_DATE_COMPLIANT",
+        "R6_1_E_RSP_FORM": "MRP_RULE_DISABLED",
+    }
+    for rule_id, reason_code in expected_outcomes.items():
+        outcome = evaluate_single_rule(get_rule(rule_id), declarations, product_ctx)
+        assert outcome.verdict == InternalVerdict.COMPLIANT
+        assert outcome.reason_code == reason_code
 
 
 @pytest.mark.asyncio

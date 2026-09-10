@@ -94,7 +94,7 @@ def parse_date(raw_line: str) -> Optional[Tuple[str, ParsedDate]]:
 
     # 2. English word month + year: "July 2026", "Jul-2026", "July, 2026"
     word_pattern = re.compile(
-        r"\b(" + "|".join(sorted(MONTH_WORDS.keys(), key=len, reverse=True)) + r")\.?,?\s*((?:19|20)\d{2})\b",
+        r"\b(" + "|".join(sorted(MONTH_WORDS.keys(), key=len, reverse=True)) + r")\.?,?\s*-?\s*((?:19|20)\d{2})\b",
         re.IGNORECASE,
     )
     m2 = word_pattern.search(raw_line)

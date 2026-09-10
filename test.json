@@ -1,0 +1,102 @@
+{
+  "product_summary": {
+    "brand": "GIZGA ESSENTIALS",
+    "product_name": "3-IN-1 SCREEN CLEANING KIT",
+    "variant": null,
+    "category": "household_product"
+  },
+  "regions": [
+    {
+      "field_type": "importer",
+      "label": "IMPORTED BY:",
+      "observed_text": "IMPORTED BY: IRIS TECH. G-1, DHARAM COMPLEX, PHASE-1, ANJUR MANKOLI ROAD, BHIWANDI-421302.",
+      "normalized_value": null,
+      "source_image_index": 0,
+      "bbox_2d": [160, 110, 205, 835],
+      "legibility": "clear"
+    },
+    {
+      "field_type": "other",
+      "label": "MODEL:",
+      "observed_text": "MODEL: GG50-PRO",
+      "normalized_value": null,
+      "source_image_index": 0,
+      "bbox_2d": [225, 110, 245, 350],
+      "legibility": "clear"
+    },
+    {
+      "field_type": "net_quantity",
+      "label": "NET QUANTITY:",
+      "observed_text": "NET QUANTITY: 1U",
+      "normalized_value": "1 U",
+      "source_image_index": 0,
+      "bbox_2d": [225, 410, 245, 590],
+      "legibility": "clear"
+    },
+    {
+      "field_type": "other",
+      "label": "SIZE:",
+      "observed_text": "SIZE: NA",
+      "normalized_value": null,
+      "source_image_index": 0,
+      "bbox_2d": [250, 110, 265, 250],
+      "legibility": "clear"
+    },
+    {
+      "field_type": "product_name",
+      "label": "COMMODITY NAME:",
+      "observed_text": "COMMODITY NAME: GIZGA ESSENTIALS 3-IN-1 SCREEN CLEANING KIT WITH150ML",
+      "normalized_value": "GIZGA ESSENTIALS 3-IN-1 SCREEN CLEANING KIT WITH 150ML",
+      "source_image_index": 0,
+      "bbox_2d": [265, 110, 305, 898],
+      "legibility": "clear"
+    },
+    {
+      "field_type": "country_of_origin",
+      "label": "COUNTRY OF ORIGIN:",
+      "observed_text": "COUNTRY OF ORIGIN: CHINA",
+      "normalized_value": "China",
+      "source_image_index": 0,
+      "bbox_2d": [320, 110, 340, 450],
+      "legibility": "clear"
+    },
+    {
+      "field_type": "manufacture_date",
+      "label": "MONTH & YEAR OF MANUFACTURING:",
+      "observed_text": "MONTH & YEAR OF MANUFACTURING: APRIL - 2026",
+      "normalized_value": "April 2026",
+      "source_image_index": 0,
+      "bbox_2d": [345, 110, 365, 675],
+      "legibility": "clear"
+    },
+    {
+      "field_type": "mrp_price",
+      "label": "MRP:",
+      "observed_text": "MRP: RS. 199.00 (INCL. OF ALL TAXES)",
+      "normalized_value": "199.00",
+      "source_image_index": 0,
+      "bbox_2d": [370, 110, 390, 560],
+      "legibility": "clear"
+    },
+    {
+      "field_type": "customer_care",
+      "label": "CUSTOMER CARE:",
+      "observed_text": "CUSTOMER CARE: ADDRESS AS STATED ABOVE PHONE: +91-90823 13224 EMAIL: IRISTECHH@GMAIL.COM",
+      "normalized_value": null,
+      "source_image_index": 0,
+      "bbox_2d": [395, 110, 440, 695],
+      "legibility": "clear"
+    },
+    {
+      "field_type": "barcode_number",
+      "label": null,
+      "observed_text": "B09RHDZ8V5",
+      "normalized_value": "B09RHDZ8V5",
+      "source_image_index": 0,
+      "bbox_2d": [525, 370, 550, 625],
+      "legibility": "clear"
+    }
+  ],
+  "image_quality_issues": [],
+  "extraction_notes": []
+}
