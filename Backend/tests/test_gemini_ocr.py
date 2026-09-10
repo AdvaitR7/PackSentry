@@ -1,10 +1,11 @@
 """
 Unit tests for GeminiFlashOcrAdapter and router failover integration.
-Verifies parsing of Gemini 2.5 Flash structured regions JSON responses, coordinate mapping,
+Verifies parsing of Gemini 3.6 Flash structured regions JSON responses, coordinate mapping,
 verbatim text preservation, and ensuring Qwen/PaddleOCR are not called when Gemini is configured.
 """
 
 import json
+import os
 from datetime import datetime
 from unittest.mock import AsyncMock, patch
 import pytest
@@ -206,7 +207,7 @@ def test_gemini_count_region_reaches_quantity_extraction_without_invented_label(
         Transform(),
     )
 
-    ocr_doc = OcrDocument(ocr_engine="gemini-2.5-flash", ocr_version="2.5", images=[slot])
+    ocr_doc = OcrDocument(ocr_engine="gemini-3.6-flash", ocr_version="3.6", images=[slot])
     declarations = extract_declarations(
         build_normalised_document(ocr_doc),
         ocr_doc,
@@ -273,7 +274,7 @@ def test_gemini_ocr_summary_commercial_entities_and_rule_04():
         1000,
         Transform(),
     )
-    ocr_doc = OcrDocument(ocr_engine="gemini-2.5-flash", ocr_version="2.5", images=[slot])
+    ocr_doc = OcrDocument(ocr_engine="gemini-3.6-flash", ocr_version="3.6", images=[slot])
     ctx = CaptureContext(
         package_type=PackageType.RETAIL,
         commodity_category=CommodityCategory.FOOD,
@@ -363,7 +364,7 @@ def test_gemini_ocr_stamped_misaligned_info_parsing():
         1000,
         Transform(),
     )
-    ocr_doc = OcrDocument(ocr_engine="gemini-2.5-flash", ocr_version="2.5", images=[slot])
+    ocr_doc = OcrDocument(ocr_engine="gemini-3.6-flash", ocr_version="3.6", images=[slot])
     ctx = CaptureContext(
         package_type=PackageType.RETAIL,
         commodity_category=CommodityCategory.FOOD,
@@ -436,7 +437,7 @@ def test_gemini_reported_fields_reach_rule_6_evaluation():
     slot = adapter._parse_response(
         response, PanelRole.BACK, "img_back", 1000, 1000, 1000, 1000, Transform()
     )
-    ocr_doc = OcrDocument(ocr_engine="gemini-2.5-flash", ocr_version="2.5", images=[slot])
+    ocr_doc = OcrDocument(ocr_engine="gemini-3.6-flash", ocr_version="3.6", images=[slot])
     capture_ctx = CaptureContext(
         package_type=PackageType.RETAIL,
         commodity_category=CommodityCategory.GENERAL,
@@ -504,12 +505,143 @@ async def test_gemini_ocr_api_http_error():
 
 
 @pytest.mark.asyncio
+async def test_gemini_ocr_timeout_error():
+    adapter = GeminiFlashOcrAdapter(api_key="test_mock_key", fallback_models=[], timeout_seconds=60.0)
+    assert adapter.timeout_seconds == 60.0
+
+    with patch("httpx.AsyncClient.post", new_callable=AsyncMock) as mock_post:
+        mock_post.side_effect = httpx.ReadTimeout("")
+
+        with pytest.raises(OcrEngineError, match="timed out after 60s"):
+            await adapter.recognize_panel(
+                analysis_bytes=b"fake_image_bytes",
+                role=PanelRole.PDP,
+                image_id="img_test_pdp",
+                analysis_width=1000,
+                analysis_height=1000,
+                original_width=2000,
+                original_height=2000,
+                transform=Transform(),
+            )
+
+
+@pytest.mark.asyncio
+async def test_gemini_ocr_fallback_to_secondary_model_on_429():
+    """Verify that if primary model fails with HTTP 429 quota, fallback model is invoked and succeeds."""
+    adapter = GeminiFlashOcrAdapter(
+        api_key="test_mock_key",
+        model="gemini-3.6-flash",
+        fallback_models=["gemini-3.5-flash"],
+        timeout_seconds=60.0,
+    )
+
+    success_payload = {
+        "candidates": [
+            {
+                "content": {
+                    "parts": [
+                        {
+                            "text": json.dumps({
+                                "product_summary": {
+                                    "brand": "FallbackBrand",
+                                    "product_name": "FallbackItem",
+                                    "variant": None,
+                                    "category": "food",
+                                },
+                                "regions": [
+                                    {
+                                        "field_type": "brand",
+                                        "label": "Brand",
+                                        "observed_text": "FallbackBrand",
+                                        "normalized_value": "FallbackBrand",
+                                        "source_image_index": 0,
+                                        "bbox_2d": [10, 10, 50, 200],
+                                        "legibility": "clear",
+                                    }
+                                ],
+                                "extraction_notes": [],
+                            })
+                        }
+                    ]
+                }
+            }
+        ]
+    }
+
+    call_urls = []
+
+    async def mock_post_impl(url, json=None):
+        call_urls.append(url)
+        if "gemini-3.6-flash" in url:
+            return httpx.Response(status_code=429, text="Rate limit exceeded")
+        elif "gemini-3.5-flash" in url:
+            return httpx.Response(status_code=200, json=success_payload)
+        return httpx.Response(status_code=500, text="Unexpected")
+
+    with patch("httpx.AsyncClient.post", new_callable=AsyncMock) as mock_post:
+        mock_post.side_effect = mock_post_impl
+
+        slot = await adapter.recognize_panel(
+            analysis_bytes=b"fake_image_bytes",
+            role=PanelRole.PDP,
+            image_id="img_fallback_test",
+            analysis_width=1000,
+            analysis_height=1000,
+            original_width=2000,
+            original_height=2000,
+            transform=Transform(),
+        )
+
+        assert len(slot.lines) == 1
+        assert slot.lines[0].raw_text == "FallbackBrand"
+        assert len(call_urls) == 2
+        assert "gemini-3.6-flash" in call_urls[0]
+        assert "gemini-3.5-flash" in call_urls[1]
+
+
+@pytest.mark.asyncio
+async def test_gemini_ocr_all_models_fail():
+    """Verify that when all models fail, an aggregate OcrEngineError is raised."""
+    adapter = GeminiFlashOcrAdapter(
+        api_key="test_mock_key",
+        model="gemini-3.6-flash",
+        fallback_models=["gemini-3.5-flash", "gemini-3.7-flash"],
+        timeout_seconds=60.0,
+    )
+
+    with patch("httpx.AsyncClient.post", new_callable=AsyncMock) as mock_post:
+        mock_post.return_value = httpx.Response(status_code=503, text="Service Unavailable")
+
+        with pytest.raises(OcrEngineError, match="All Gemini models failed"):
+            await adapter.recognize_panel(
+                analysis_bytes=b"fake_image_bytes",
+                role=PanelRole.PDP,
+                image_id="img_all_fail",
+                analysis_width=1000,
+                analysis_height=1000,
+                original_width=2000,
+                original_height=2000,
+                transform=Transform(),
+            )
+        assert mock_post.call_count == 3
+
+
+@pytest.mark.asyncio
+async def test_gemini_ocr_default_timeout_from_env():
+    with patch.dict("os.environ", {"GEMINI_TIMEOUT_SECONDS": "75.0"}):
+        from app.ocr.gemini_engine import GeminiFlashOcrAdapter as FreshAdapter
+        # Re-evaluating default timeout
+        fresh = FreshAdapter(api_key="mock", timeout_seconds=float(os.environ.get("GEMINI_TIMEOUT_SECONDS", "60.0")))
+        assert fresh.timeout_seconds == 75.0
+
+
+@pytest.mark.asyncio
 async def test_ocr_router_uses_only_gemini_when_key_set():
     """Verify router selects Gemini exclusively and does not initialize or run PaddleOCR/Qwen."""
     with patch.dict("os.environ", {"GEMINI_API_KEY": "test_key_live"}):
         router = OcrRouter()
         assert len(router.engines) == 1
-        assert router.engines[0].engine_name == "gemini-2.5-flash"
+        assert router.engines[0].engine_name == "gemini-3.6-flash"
 
 
 @pytest.mark.asyncio
@@ -549,7 +681,7 @@ async def test_ocr_router_gemini_primary_success():
             transform=Transform(),
         )
 
-        assert engine_used == "gemini-2.5-flash"
+        assert engine_used == "gemini-3.6-flash"
         assert len(slot.lines) == 1
         assert slot.lines[0].raw_text == "Sample Text"
         fallback_engine.recognize_panel.assert_not_called()

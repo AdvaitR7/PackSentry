@@ -316,7 +316,7 @@ class InspectionWorker:
 
         # Selective VLM Fallback (D7) only when neither Gemini nor Qwen served as primary OCR
         # so Gemini / Qwen primary OCR remains authoritative without unnecessary re-inference.
-        if "gemini-2.5-flash" not in engines_used and "qwen2.5vl" not in engines_used and await self.vlm_interpreter.is_reachable():
+        if "gemini-3.6-flash" not in engines_used and "qwen2.5vl" not in engines_used and await self.vlm_interpreter.is_reachable():
             critical_fields = [Field.NET_QUANTITY, Field.RETAIL_SALE_PRICE]
             for crit_field in critical_fields:
                 existing_decl = next((d for d in declaration_set.declarations if d.field == crit_field), None)

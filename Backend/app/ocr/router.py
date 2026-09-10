@@ -2,7 +2,7 @@
 OCR Router and Failover Orchestrator.
 
 Runs one OCR engine at a time for each panel in priority order:
-Gemini 2.5 Flash -> Qwen2.5-VL -> PaddleOCR -> Google Cloud Vision.
+Gemini 3.6 Flash -> Qwen2.5-VL -> PaddleOCR -> Google Cloud Vision.
 """
 
 import logging
@@ -42,7 +42,7 @@ class OcrRouter:
         else:
             gemini = GeminiFlashOcrAdapter()
             if gemini.api_key:
-                # Use Gemini 2.5 Flash exclusively when configured; do NOT run PaddleOCR or Qwen
+                # Use Gemini exclusively when configured (internal fallback across Gemini 3 family); do NOT run PaddleOCR or Qwen
                 self.engines = [gemini]
             else:
                 self.engines = [

@@ -1,7 +1,7 @@
 """
-Gemini 2.5 Flash OCR and Visual Label Extraction Adapter.
+Gemini 3.6 Flash OCR and Visual Label Extraction Adapter.
 
-Invokes Google AI Studio Gemini 2.5 Flash via REST API using high-precision
+Invokes Google AI Studio Gemini 3.6 Flash via REST API using high-precision
 product-label extraction prompting and structured region schema.
 Emits standardized Line and ImageSlot structures with normalized coordinates,
 flowing seamlessly through downstream deterministic normalisation, extraction,
@@ -21,7 +21,16 @@ from .protocol import OcrEngineError
 
 logger = logging.getLogger("packsentry.ocr.gemini")
 
-DEFAULT_GEMINI_MODEL = os.environ.get("GEMINI_OCR_MODEL", "gemini-2.5-flash")
+DEFAULT_GEMINI_MODEL = os.environ.get("GEMINI_OCR_MODEL", "gemini-3.6-flash")
+DEFAULT_GEMINI_FALLBACK_MODELS = [
+    m.strip()
+    for m in os.environ.get(
+        "GEMINI_FALLBACK_MODELS",
+        "gemini-3.5-flash,gemini-3.7-flash,gemini-3.8-flash,gemini-3-flash-preview",
+    ).split(",")
+    if m.strip()
+]
+DEFAULT_GEMINI_TIMEOUT = float(os.environ.get("GEMINI_TIMEOUT_SECONDS", "60.0"))
 GEMINI_API_ENDPOINT = "https://generativelanguage.googleapis.com/v1beta/models"
 
 SYSTEM_PROMPT = """You are a high-precision visual product-label extraction system.
@@ -239,19 +248,23 @@ STRUCTURED_RESPONSE_SCHEMA = {
 
 
 class GeminiFlashOcrAdapter:
-    """OcrEngine implementation using Gemini 2.5 Flash via Google AI Studio REST API."""
+    """OcrEngine implementation using Gemini 3.6 Flash via Google AI Studio REST API."""
 
-    engine_name = "gemini-2.5-flash"
-    engine_version = "2.5"
+    engine_name = "gemini-3.6-flash"
+    engine_version = "3.6"
 
     def __init__(
         self,
         api_key: Optional[str] = None,
         model: str = DEFAULT_GEMINI_MODEL,
-        timeout_seconds: float = 18.0,
+        fallback_models: Optional[List[str]] = None,
+        timeout_seconds: float = DEFAULT_GEMINI_TIMEOUT,
     ):
         self.api_key = api_key or os.environ.get("GEMINI_API_KEY", "").strip()
         self.model = model
+        self.fallback_models = (
+            fallback_models if fallback_models is not None else list(DEFAULT_GEMINI_FALLBACK_MODELS)
+        )
         self.timeout_seconds = timeout_seconds
 
     async def is_available(self) -> bool:
@@ -270,7 +283,7 @@ class GeminiFlashOcrAdapter:
         transform: Transform,
     ) -> ImageSlot:
         """
-        Extracts all visible text regions verbatim using Gemini 2.5 Flash.
+        Extracts all visible text regions verbatim using Gemini 3.6 Flash.
         Maps region bounding boxes back to original and normalized coordinate spaces.
         """
         if not self.api_key:
@@ -302,39 +315,52 @@ class GeminiFlashOcrAdapter:
             },
         }
 
-        url = f"{GEMINI_API_ENDPOINT}/{self.model}:generateContent?key={self.api_key}"
+        models_to_try = [self.model] + [m for m in self.fallback_models if m != self.model]
+        failures: List[str] = []
 
-        try:
-            async with httpx.AsyncClient(timeout=self.timeout_seconds) as client:
-                res = await client.post(url, json=payload)
-                if res.status_code != 200:
-                    raise OcrEngineError(
-                        f"Gemini API returned HTTP {res.status_code}: {res.text[:400]}"
-                    )
-                data = res.json()
-                raw_response = self._extract_candidate_text(data)
-        except OcrEngineError:
-            raise
-        except Exception as exc:
-            raise OcrEngineError(f"Gemini 2.5 Flash OCR inference failed: {exc}") from exc
+        for candidate_model in models_to_try:
+            url = f"{GEMINI_API_ENDPOINT}/{candidate_model}:generateContent?key={self.api_key}"
+            try:
+                async with httpx.AsyncClient(timeout=self.timeout_seconds) as client:
+                    res = await client.post(url, json=payload)
+                    if res.status_code != 200:
+                        raise OcrEngineError(
+                            f"Gemini API returned HTTP {res.status_code}: {res.text[:400]}"
+                        )
+                    data = res.json()
+                    raw_response = self._extract_candidate_text(data)
 
-        slot = self._parse_response(
-            raw_response=raw_response,
-            role=role,
-            image_id=image_id,
-            analysis_width=analysis_width,
-            analysis_height=analysis_height,
-            original_width=original_width,
-            original_height=original_height,
-            transform=transform,
-        )
-        logger.info(
-            "Gemini 2.5 Flash OCR extracted %d regions for panel '%s' (%s)",
-            len(slot.lines),
-            role.value,
-            image_id,
-        )
-        return slot
+                slot = self._parse_response(
+                    raw_response=raw_response,
+                    role=role,
+                    image_id=image_id,
+                    analysis_width=analysis_width,
+                    analysis_height=analysis_height,
+                    original_width=original_width,
+                    original_height=original_height,
+                    transform=transform,
+                )
+                logger.info(
+                    "Gemini model '%s' OCR extracted %d regions for panel '%s' (%s)",
+                    candidate_model,
+                    len(slot.lines),
+                    role.value,
+                    image_id,
+                )
+                return slot
+            except httpx.TimeoutException:
+                err = f"{candidate_model} timed out after {self.timeout_seconds:.0f}s"
+                failures.append(err)
+                logger.warning("Gemini OCR %s. Trying next candidate model.", err)
+            except OcrEngineError as exc:
+                failures.append(f"{candidate_model}: {exc}")
+                logger.warning("Gemini OCR model '%s' failed (%s). Trying next candidate model.", candidate_model, exc)
+            except Exception as exc:
+                err_msg = str(exc) or type(exc).__name__
+                failures.append(f"{candidate_model}: {err_msg}")
+                logger.warning("Gemini OCR model '%s' failed (%s). Trying next candidate model.", candidate_model, err_msg)
+
+        raise OcrEngineError(f"All Gemini models failed: {'; '.join(failures)}")
 
     def _extract_candidate_text(self, data: Dict[str, Any]) -> str:
         """Extracts generated text string from Gemini API response candidates."""
