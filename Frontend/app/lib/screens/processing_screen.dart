@@ -3,6 +3,8 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import '../models/models.dart';
 import '../services/api_service.dart';
+import '../theme/app_theme.dart';
+import '../widgets/ps_card.dart';
 import 'results_screen.dart';
 
 class ProcessingScreen extends StatefulWidget {
@@ -44,13 +46,25 @@ class _ProcessingScreenState extends State<ProcessingScreen> {
     'COMPLETE',
   ];
 
+  static const Map<String, String> _stageDescriptions = {
+    'QUEUED': 'Enqueuing inspection job into server worker queue...',
+    'PREPROCESSING': 'Normalising orientation & contrast enhancement...',
+    'OCR': 'Extracting raw packaging text with Cloud Vision & PaddleOCR...',
+    'EXTRACTING': 'Synthesising D1-D6 statutory declarations...',
+    'EVALUATING': 'Evaluating Rules under Legal Metrology 2011 standard...',
+    'PERSISTING': 'Writing audit trace & evidence spans to database...',
+    'COMPLETE': 'Statutory compliance verification complete.',
+  };
+
   @override
   void initState() {
     super.initState();
     if (widget.existingInspectionId != null) {
       _inspectionId = widget.existingInspectionId;
       _startPolling();
-    } else if (widget.captureContext != null && widget.pdpBytes != null && widget.backBytes != null) {
+    } else if (widget.captureContext != null &&
+        widget.pdpBytes != null &&
+        widget.backBytes != null) {
       _initiateInspection();
     }
   }
@@ -106,7 +120,9 @@ class _ProcessingScreenState extends State<ProcessingScreen> {
           );
         } else if (result is Map<String, dynamic>) {
           final status = result['status'] as String? ?? 'QUEUED';
-          final msg = (result['stage_message'] as String?) ?? (result['error_message'] as String?) ?? status;
+          final msg = (result['stage_message'] as String?) ??
+              (result['error_message'] as String?) ??
+              status;
 
           if (status == 'FAILED') {
             timer.cancel();
@@ -132,42 +148,80 @@ class _ProcessingScreenState extends State<ProcessingScreen> {
     final isDone = currentIndex > index || _currentStatus == 'COMPLETE';
     final isCurrent = _currentStatus == stageName;
 
-    Color color;
-    IconData icon;
+    Widget statusIndicator;
 
     if (isDone) {
-      color = Colors.green;
-      icon = Icons.check_circle;
+      statusIndicator = Container(
+        width: 18,
+        height: 18,
+        decoration: const BoxDecoration(
+          color: AppColors.compliantBg,
+          shape: BoxShape.circle,
+        ),
+        child: const Icon(Icons.check, size: 12, color: AppColors.compliantText),
+      );
     } else if (isCurrent) {
-      color = Colors.blue;
-      icon = Icons.radio_button_checked;
+      statusIndicator = Container(
+        width: 18,
+        height: 18,
+        decoration: const BoxDecoration(
+          color: AppColors.primaryLight,
+          shape: BoxShape.circle,
+        ),
+        child: const Center(
+          child: SizedBox(
+            width: 10,
+            height: 10,
+            child: CircularProgressIndicator(strokeWidth: 1.5, color: AppColors.primary),
+          ),
+        ),
+      );
     } else {
-      color = Colors.grey.shade400;
-      icon = Icons.radio_button_unchecked;
+      statusIndicator = Container(
+        width: 18,
+        height: 18,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          border: Border.all(color: AppColors.border, width: 1.5),
+        ),
+      );
     }
 
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 6),
+      padding: const EdgeInsets.symmetric(vertical: 8),
       child: Row(
         children: [
-          Icon(icon, color: color, size: 22),
-          const SizedBox(width: 12),
-          Text(
-            stageName,
-            style: TextStyle(
-              fontSize: 15,
-              fontWeight: isCurrent ? FontWeight.bold : FontWeight.normal,
-              color: isCurrent ? Colors.blue.shade900 : Colors.black87,
+          statusIndicator,
+          const SizedBox(width: 14),
+          Expanded(
+            child: Text(
+              stageName,
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: isCurrent ? FontWeight.w700 : (isDone ? FontWeight.w600 : FontWeight.w500),
+                color: isCurrent
+                    ? AppColors.primary
+                    : (isDone ? AppColors.textPrimary : AppColors.textSecondary),
+              ),
             ),
           ),
-          if (isCurrent) ...[
-            const Spacer(),
-            const SizedBox(
-              width: 16,
-              height: 16,
-              child: CircularProgressIndicator(strokeWidth: 2),
+          if (isCurrent)
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+              decoration: BoxDecoration(
+                color: AppColors.primaryLight,
+                borderRadius: BorderRadius.circular(4),
+              ),
+              child: const Text(
+                'PROCESSING',
+                style: TextStyle(
+                  fontSize: 9,
+                  fontWeight: FontWeight.w800,
+                  color: AppColors.primary,
+                  letterSpacing: 0.5,
+                ),
+              ),
             ),
-          ],
         ],
       ),
     );
@@ -175,6 +229,9 @@ class _ProcessingScreenState extends State<ProcessingScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final currentIndex = _stages.indexOf(_currentStatus).clamp(0, _stages.length - 1);
+    final progressFraction = (currentIndex + 1) / _stages.length;
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('Compliance Analysis'),
@@ -188,53 +245,162 @@ class _ProcessingScreenState extends State<ProcessingScreen> {
               ? Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    const Icon(Icons.error_outline, size: 70, color: Colors.red),
-                    const SizedBox(height: 16),
-                    const Text('Inspection Failed', style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
-                    const SizedBox(height: 10),
-                    Text(_errorMessage!, textAlign: TextAlign.center, style: const TextStyle(color: Colors.red)),
+                    Container(
+                      width: 72,
+                      height: 72,
+                      decoration: const BoxDecoration(
+                        color: AppColors.violationBg,
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Center(
+                        child: Icon(Icons.error_outline, size: 40, color: AppColors.violation),
+                      ),
+                    ),
+                    const SizedBox(height: 18),
+                    const Text(
+                      'Inspection Failed',
+                      style: TextStyle(fontSize: 22, fontWeight: FontWeight.w800),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      _errorMessage!,
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(color: AppColors.violationText, fontSize: 13),
+                    ),
                     const SizedBox(height: 24),
-                    ElevatedButton(
-                      onPressed: () => Navigator.pop(context),
-                      child: const Text('Return to Wizard'),
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton(
+                        onPressed: () => Navigator.pop(context),
+                        child: const Text('Return to Wizard'),
+                      ),
                     ),
                   ],
                 )
               : Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    const SizedBox(
-                      width: 70,
-                      height: 70,
-                      child: CircularProgressIndicator(strokeWidth: 4),
+                    // Stage Pill
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
+                      decoration: BoxDecoration(
+                        color: AppColors.primaryLight,
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: Text(
+                        'STAGE ${currentIndex + 1} OF ${_stages.length}',
+                        style: const TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w800,
+                          color: AppColors.primary,
+                          letterSpacing: 0.5,
+                        ),
+                      ),
                     ),
-                    const SizedBox(height: 24),
+                    const SizedBox(height: 20),
+
+                    // Glowing Circle Avatar
+                    Container(
+                      width: 90,
+                      height: 90,
+                      decoration: BoxDecoration(
+                        color: AppColors.darkHero,
+                        shape: BoxShape.circle,
+                        boxShadow: const [
+                          BoxShadow(
+                            color: Color(0x332563EB),
+                            blurRadius: 24,
+                            spreadRadius: 4,
+                          ),
+                        ],
+                      ),
+                      child: const Center(
+                        child: Text(
+                          '⚡',
+                          style: TextStyle(fontSize: 36),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+
+                    // Stage Title & Subtitle
                     Text(
-                      _stageMessage,
+                      _currentStatus == 'QUEUED'
+                          ? 'Queued for Analysis...'
+                          : (_currentStatus == 'EVALUATING'
+                              ? 'Evaluating Rules…'
+                              : 'Processing Stage: $_currentStatus'),
                       textAlign: TextAlign.center,
-                      style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                      style: const TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.w800,
+                        color: AppColors.textPrimary,
+                      ),
                     ),
-                    const SizedBox(height: 8),
-                    if (_inspectionId != null)
+                    const SizedBox(height: 6),
+                    Text(
+                      _stageDescriptions[_currentStatus] ?? _stageMessage,
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(
+                        fontSize: 13,
+                        color: AppColors.textSecondary,
+                        height: 1.4,
+                      ),
+                    ),
+                    if (_inspectionId != null) ...[
+                      const SizedBox(height: 6),
                       Text(
                         'ID: $_inspectionId',
-                        style: const TextStyle(fontSize: 12, color: Colors.grey),
-                      ),
-                    const SizedBox(height: 32),
-                    Card(
-                      child: Padding(
-                        padding: const EdgeInsets.all(16),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const Text(
-                              'Pipeline Progress',
-                              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-                            ),
-                            const Divider(),
-                            ..._stages.asMap().entries.map((e) => _stageStep(e.value, e.key)),
-                          ],
+                        style: const TextStyle(
+                          fontSize: 11,
+                          color: AppColors.textMuted,
+                          fontWeight: FontWeight.w600,
                         ),
+                      ),
+                    ],
+                    const SizedBox(height: 20),
+
+                    // Progress Bar
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(6),
+                      child: LinearProgressIndicator(
+                        value: progressFraction,
+                        minHeight: 6,
+                        backgroundColor: const Color(0xFFE2E8F0),
+                        valueColor: const AlwaysStoppedAnimation<Color>(AppColors.primary),
+                      ),
+                    ),
+                    const SizedBox(height: 24),
+
+                    // Stages Card
+                    PsCard(
+                      padding: const EdgeInsets.all(16),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text(
+                            'Pipeline Progress',
+                            style: TextStyle(
+                              fontWeight: FontWeight.w800,
+                              fontSize: 15,
+                              color: AppColors.textPrimary,
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          const Divider(height: 1),
+                          const SizedBox(height: 4),
+                          ..._stages.asMap().entries.map((e) => _stageStep(e.value, e.key)),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+
+                    const Text(
+                      'Encrypted TLS • 750ms polling',
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: AppColors.textSecondary,
+                        letterSpacing: 0.2,
                       ),
                     ),
                   ],

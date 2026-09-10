@@ -7,8 +7,8 @@ void main() {
     await tester.pumpWidget(const PackSentryApp());
     await tester.pumpAndSettle();
 
-    // Verify that the AppShell renders the Inspect tab and title.
-    expect(find.text('New Inspection — 1/3 Details'), findsOneWidget);
-    expect(find.text('Package Context'), findsOneWidget);
+    // Verify that the AppShell renders the Inspect home tab (Figma 01).
+    expect(find.text('New Package Inspection'), findsOneWidget);
+    expect(find.text('Start Inspection →'), findsOneWidget);
   });
 }
