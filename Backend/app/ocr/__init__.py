@@ -9,6 +9,7 @@ Provides:
 """
 
 from .cloud_vision import CircuitBreaker, CircuitState, GoogleCloudVisionAdapter
+from .gemini_engine import GeminiFlashOcrAdapter
 from .paddleocr_engine import PaddleOcrAdapter
 from .protocol import CircuitBreakerOpenError, OcrEngine, OcrEngineError
 from .qwen_engine import QwenOcrAdapter
@@ -22,6 +23,7 @@ __all__ = [
     "CircuitBreaker",
     "CircuitState",
     "GoogleCloudVisionAdapter",
+    "GeminiFlashOcrAdapter",
     "PaddleOcrAdapter",
     "QwenOcrAdapter",
     "OcrRouter",

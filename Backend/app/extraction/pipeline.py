@@ -12,7 +12,7 @@ Guarantees:
 """
 
 import re
-from typing import Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 from lmpc_schema import (
     CaptureContext,
     Declaration,
@@ -163,6 +163,23 @@ def extract_declarations(
         extracted, Field.RETAIL_SALE_PRICE, normalised_doc, line_lookup, parse_price,
         alias_key="RETAIL_SALE_PRICE", pattern_confidence=0.90,
     )
+    price_decl = extracted.get(Field.RETAIL_SALE_PRICE)
+    if price_decl and price_decl.status == ExtractionStatus.FOUND and price_decl.parsed:
+        from lmpc_schema import ParsedPrice
+        if isinstance(price_decl.parsed, ParsedPrice) and not price_decl.parsed.inclusive_phrase_present:
+            for n_line in normalised_doc.lines:
+                lower = n_line.raw_text.lower()
+                if any(tp in lower for tp in [
+                    "all taxes", "all tax", "of all taxes", "incl. of all taxes",
+                    "inclusive of all taxes", "incl of all taxes", "incl. of taxes",
+                    "incl. taxes", "incl taxes", "taxes incl", "tax incl", "सभी कर",
+                ]) or ("tax" in lower and any(w in lower for w in ["incl", "inclusive", "all"])):
+                    price_decl.parsed.inclusive_phrase_present = True
+                    price_decl.raw_value = f"{price_decl.raw_value} {n_line.raw_text}"
+                    line_obj, img_id = line_lookup.get(n_line.line_id, (None, ""))
+                    if line_obj:
+                        price_decl.evidence.append(_create_evidence_span(line_obj, img_id))
+                    break
 
     # 3. DATE_OF_MANUFACTURE_PACKING_IMPORT (D3)
     _assign_first_match(
@@ -176,69 +193,99 @@ def extract_declarations(
     pkr_lines: List[Tuple[Line, str]] = []
     imp_lines: List[Tuple[Line, str]] = []
 
+    mfg_pattern = re.compile(r"manufactur(?:ed|er|ing)?(?:\s+by)?|mfd\.?(?:\s+by)?|mfg\.?(?:\s+by)?|mfr\.?(?:\s+by)?|उत्पादक", re.IGNORECASE)
+    pkr_pattern = re.compile(r"pack(?:ed|er|ing)?(?:\s+by)?|pkd\.?(?:\s+by)?|market(?:ed|ing)?(?:\s+by)?|mktg?\.?(?:\s+by)?|mk[td]\.?(?:\s+by)?|पैकर", re.IGNORECASE)
+    imp_pattern = re.compile(r"import(?:ed|er)?(?:\s+by)?|imp\.?(?:\s+by)?|आयातकर्ता", re.IGNORECASE)
+
     for n_line in normalised_doc.lines:
         line_obj, img_id = line_lookup.get(n_line.line_id, (None, ""))
         if not line_obj:
             continue
 
         raw = line_obj.raw_text
-        if re.search(r"manufactured\s+by|mfd\.?\s+by|mfg\.?\s+by|उत्पादक", raw, re.IGNORECASE):
+        if mfg_pattern.search(raw) or "MANUFACTURER" in n_line.matched_aliases:
             mfg_lines.append((line_obj, img_id))
-        elif re.search(r"packed\s+by|pkd\.?\s+by|पैकर", raw, re.IGNORECASE):
+        elif pkr_pattern.search(raw) or "PACKER" in n_line.matched_aliases:
             pkr_lines.append((line_obj, img_id))
-        elif re.search(r"imported\s+by|imp\.?\s+by|आयातकर्ता", raw, re.IGNORECASE):
+        elif imp_pattern.search(raw) or "IMPORTER" in n_line.matched_aliases:
             imp_lines.append((line_obj, img_id))
 
+    def _collect_address_block(candidates: List[Tuple[Line, str]]) -> Optional[Tuple[str, Any, List[EvidenceSpan], float]]:
+        if not candidates:
+            return None
+        head_line, head_img = candidates[0]
+        collected = [head_line.raw_text]
+        evidence = [_create_evidence_span(head_line, head_img)]
+
+        # Join subsequent lines on same panel to recover complete multi-line addresses
+        found_head = False
+        for n_l in normalised_doc.lines:
+            if n_l.line_id == head_line.line_id:
+                found_head = True
+                continue
+            if found_head:
+                l_obj, i_id = line_lookup.get(n_l.line_id, (None, ""))
+                if not l_obj or i_id != head_img:
+                    break
+                if re.search(r"\b(?:m\.?r\.?p\.?|net\s+qty|net\s+weight|consumer\s+care|customer\s+care|batch|exp|best\s+before|ingredients)\b", l_obj.raw_text, re.IGNORECASE):
+                    break
+                collected.append(l_obj.raw_text)
+                evidence.append(_create_evidence_span(l_obj, i_id))
+                if re.search(r"\b[1-9][0-9]{2}\s?[0-9]{3}\b", l_obj.raw_text):
+                    break
+                if len(collected) >= 5:
+                    break
+
+        res = parse_address_block(collected)
+        if res:
+            raw_val, addr_obj = res
+            return raw_val, addr_obj, evidence, head_line.confidence
+        return None
+
     # Evaluate manufacturer address block
-    if mfg_lines:
-        line_obj, img_id = mfg_lines[0]
-        parsed_addr = parse_address_block([line_obj.raw_text])
-        if parsed_addr:
-            raw_val, addr_obj = parsed_addr
-            extracted[Field.MANUFACTURER_NAME_ADDRESS] = Declaration(
-                field=Field.MANUFACTURER_NAME_ADDRESS,
-                status=ExtractionStatus.FOUND,
-                raw_value=raw_val,
-                parsed=addr_obj,
-                evidence=[_create_evidence_span(line_obj, img_id)],
-                ocr_confidence=line_obj.confidence,
-                extraction_confidence=0.95,
-                method=ExtractionMethod.ALIAS_ANCHOR,
-            )
+    mfg_res = _collect_address_block(mfg_lines)
+    if mfg_res:
+        raw_val, addr_obj, ev_spans, conf = mfg_res
+        extracted[Field.MANUFACTURER_NAME_ADDRESS] = Declaration(
+            field=Field.MANUFACTURER_NAME_ADDRESS,
+            status=ExtractionStatus.FOUND,
+            raw_value=raw_val,
+            parsed=addr_obj,
+            evidence=ev_spans,
+            ocr_confidence=conf,
+            extraction_confidence=0.95,
+            method=ExtractionMethod.ALIAS_ANCHOR,
+        )
 
     # Evaluate packer address block
-    if pkr_lines:
-        line_obj, img_id = pkr_lines[0]
-        parsed_addr = parse_address_block([line_obj.raw_text])
-        if parsed_addr:
-            raw_val, addr_obj = parsed_addr
-            extracted[Field.PACKER_NAME_ADDRESS] = Declaration(
-                field=Field.PACKER_NAME_ADDRESS,
-                status=ExtractionStatus.FOUND,
-                raw_value=raw_val,
-                parsed=addr_obj,
-                evidence=[_create_evidence_span(line_obj, img_id)],
-                ocr_confidence=line_obj.confidence,
-                extraction_confidence=0.95,
-                method=ExtractionMethod.ALIAS_ANCHOR,
-            )
+    pkr_res = _collect_address_block(pkr_lines)
+    if pkr_res:
+        raw_val, addr_obj, ev_spans, conf = pkr_res
+        extracted[Field.PACKER_NAME_ADDRESS] = Declaration(
+            field=Field.PACKER_NAME_ADDRESS,
+            status=ExtractionStatus.FOUND,
+            raw_value=raw_val,
+            parsed=addr_obj,
+            evidence=ev_spans,
+            ocr_confidence=conf,
+            extraction_confidence=0.95,
+            method=ExtractionMethod.ALIAS_ANCHOR,
+        )
 
     # Evaluate importer address block
-    if imp_lines:
-        line_obj, img_id = imp_lines[0]
-        parsed_addr = parse_address_block([line_obj.raw_text])
-        if parsed_addr:
-            raw_val, addr_obj = parsed_addr
-            extracted[Field.IMPORTER_NAME_ADDRESS] = Declaration(
-                field=Field.IMPORTER_NAME_ADDRESS,
-                status=ExtractionStatus.FOUND,
-                raw_value=raw_val,
-                parsed=addr_obj,
-                evidence=[_create_evidence_span(line_obj, img_id)],
-                ocr_confidence=line_obj.confidence,
-                extraction_confidence=0.95,
-                method=ExtractionMethod.ALIAS_ANCHOR,
-            )
+    imp_res = _collect_address_block(imp_lines)
+    if imp_res:
+        raw_val, addr_obj, ev_spans, conf = imp_res
+        extracted[Field.IMPORTER_NAME_ADDRESS] = Declaration(
+            field=Field.IMPORTER_NAME_ADDRESS,
+            status=ExtractionStatus.FOUND,
+            raw_value=raw_val,
+            parsed=addr_obj,
+            evidence=ev_spans,
+            ocr_confidence=conf,
+            extraction_confidence=0.95,
+            method=ExtractionMethod.ALIAS_ANCHOR,
+        )
 
     # 5. COUNTRY_OF_ORIGIN
     for n_line in normalised_doc.lines:
@@ -261,24 +308,27 @@ def extract_declarations(
             break
 
     # 6. CONSUMER_CARE
+    cc_spans: List[Tuple[Line, str]] = []
     for n_line in normalised_doc.lines:
         line_obj, img_id = line_lookup.get(n_line.line_id, (None, ""))
         if not line_obj:
             continue
-        cc = parse_consumer_care(line_obj.raw_text)
-        if cc:
-            raw_val, desc = cc
-            extracted[Field.CONSUMER_CARE] = Declaration(
-                field=Field.CONSUMER_CARE,
-                status=ExtractionStatus.FOUND,
-                raw_value=raw_val,
-                parsed=None,
-                evidence=[_create_evidence_span(line_obj, img_id)],
-                ocr_confidence=line_obj.confidence,
-                extraction_confidence=0.94,
-                method=ExtractionMethod.ALIAS_ANCHOR,
-            )
-            break
+        if "CONSUMER_CARE" in n_line.matched_aliases or parse_consumer_care(line_obj.raw_text):
+            cc_spans.append((line_obj, img_id))
+
+    if cc_spans:
+        first_line, first_img = cc_spans[0]
+        combined_text = " | ".join(l.raw_text for l, _ in cc_spans)
+        extracted[Field.CONSUMER_CARE] = Declaration(
+            field=Field.CONSUMER_CARE,
+            status=ExtractionStatus.FOUND,
+            raw_value=combined_text,
+            parsed=None,
+            evidence=[_create_evidence_span(l, img) for l, img in cc_spans],
+            ocr_confidence=first_line.confidence,
+            extraction_confidence=0.96,
+            method=ExtractionMethod.ALIAS_ANCHOR,
+        )
 
     # 7. COMMON_GENERIC_NAME
     # Look for explicit generic name tag, or first prominent PDP line

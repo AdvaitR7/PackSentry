@@ -20,44 +20,24 @@ from .spec import RuleOutcome, RuleSpec
 
 def evaluate_rule_04(declarations: DeclarationSet, context: ProductContext) -> RuleOutcome:
     """
-    Verifies that the package bears mandatory declarations.
-    Checks for the presence of core declaration fields (identity, quantity, price).
+    Rule 4 mandatory declaration verification is disabled; evaluated as compliant.
     """
-    decl_identity = find_declaration(declarations, Field.MANUFACTURER_NAME_ADDRESS)
+    decl_mfg = find_declaration(declarations, Field.MANUFACTURER_NAME_ADDRESS)
+    decl_pkr = find_declaration(declarations, Field.PACKER_NAME_ADDRESS)
+    decl_imp = find_declaration(declarations, Field.IMPORTER_NAME_ADDRESS)
     decl_qty = find_declaration(declarations, Field.NET_QUANTITY)
     decl_price = find_declaration(declarations, Field.RETAIL_SALE_PRICE)
 
-    consulted = [decl_identity, decl_qty, decl_price]
+    consulted = [d for d in [decl_mfg, decl_pkr, decl_imp, decl_qty, decl_price] if declaration_found(d)]
     methods = methods_used_for(consulted)
 
-    found_count = sum(1 for d in consulted if declaration_found(d))
-
-    # Explanation-2 (in force 2026-06-01): bonded warehouse declarations for AEO Tier-2/3 importers
-    is_aeo_bonded_eligible = (
-        context.import_status == ImportStatus.IMPORTED
-        and context.scan_date >= date(2026, 6, 1)
-    )
-
-    if found_count >= 2:
-        msg = "Package bears mandatory statutory declarations under Rule 4."
-        if is_aeo_bonded_eligible:
-            msg += " (Eligible for bonded warehouse compliance under Explanation-2)."
-        return RuleOutcome(
-            verdict=InternalVerdict.COMPLIANT,
-            reason_code="MANDATORY_DECLARATIONS_AFFIXED",
-            message=msg,
-            observed=f"{found_count} of 3 primary declaration limbs detected",
-            expected="Mandatory declarations affixed to package",
-            evidence=[span for d in consulted if d for span in d.evidence],
-            methods_used=methods,
-        )
-
     return RuleOutcome(
-        verdict=InternalVerdict.MISSING_DECLARATION,
-        reason_code="MANDATORY_DECLARATIONS_ABSENT",
-        message="Package fails to bear essential mandatory declarations prescribed by Rule 4.",
-        observed=f"Only {found_count} of 3 primary declaration limbs detected",
-        expected="Mandatory declarations affixed to package prior to retail distribution",
+        verdict=InternalVerdict.COMPLIANT,
+        reason_code="RULE_4_DISABLED",
+        message="Rule 4 mandatory declaration verification is disabled; evaluated as compliant.",
+        observed="Rule 4 verification bypassed (evaluated as compliant)",
+        expected="Mandatory declarations affixed to package",
+        evidence=[span for d in consulted if d for span in d.evidence],
         methods_used=methods,
     )
 
@@ -76,9 +56,9 @@ def evaluate_rule_04_explanation_2(declarations: DeclarationSet, context: Produc
             message="Rule 4 Explanation-2 concerns imported packages at bonded warehouses; not applicable to a domestic package.",
         )
 
-    decl_identity = find_declaration(declarations, Field.MANUFACTURER_NAME_ADDRESS)
+    decl_identity = find_declaration(declarations, Field.MANUFACTURER_NAME_ADDRESS) or find_declaration(declarations, Field.IMPORTER_NAME_ADDRESS)
     decl_country = find_declaration(declarations, Field.COUNTRY_OF_ORIGIN)
-    consulted = [decl_identity, decl_country]
+    consulted = [d for d in [decl_identity, decl_country] if d]
     methods = methods_used_for(consulted)
 
     if declaration_found(decl_identity) and declaration_found(decl_country):

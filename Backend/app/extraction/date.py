@@ -34,9 +34,9 @@ DEVANAGARI_MONTHS = {
 }
 
 LABEL_PATTERNS = [
-    (re.compile(r"\bmfg\b|\bmanufactur", re.IGNORECASE), DateLabel.MFG),
-    (re.compile(r"\bpkd\b|\bpack(?:ed|ing)?\b", re.IGNORECASE), DateLabel.PKD),
-    (re.compile(r"\bimport(?:ed)?\b", re.IGNORECASE), DateLabel.IMPORTED),
+    (re.compile(r"\bmf[gd]\b|\bmanufactur|उत्पादक?|निर्माण", re.IGNORECASE), DateLabel.MFG),
+    (re.compile(r"\bpkd\b|\bpack(?:ed|ing)?\b|पैकिंग", re.IGNORECASE), DateLabel.PKD),
+    (re.compile(r"\bimport(?:ed)?\b|आयात", re.IGNORECASE), DateLabel.IMPORTED),
 ]
 
 
@@ -61,7 +61,26 @@ def parse_date(raw_line: str) -> Optional[Tuple[str, ParsedDate]]:
     if not raw_line:
         return None
 
+    # Exclude standalone expiry / best before / use by declarations that lack manufacture or packing indicators
+    if (
+        re.search(r"\b(?:exp(?:iry)?|use\s+by|use\s+before|best\s+before)\b", raw_line, re.IGNORECASE)
+        and not re.search(r"\bmf[gd]\b|\bmanufactur|\bpkd\b|\bpack(?:ed|ing)?\b|उत्पाद|पैकिंग", raw_line, re.IGNORECASE)
+    ):
+        return None
+
     label = _detect_label(raw_line)
+
+    # 0. Numeric DD/MM/YYYY or DD-MM-YYYY or DD.MM.YYYY
+    dd_mm_yyyy_pattern = re.compile(
+        r"\b(?:0?[1-9]|[12][0-9]|3[01])\s*[/.\-]\s*(0?[1-9]|1[0-2])\s*[/.\-]\s*((?:19|20)\d{2}|\d{2})\b"
+    )
+    m0 = dd_mm_yyyy_pattern.search(raw_line)
+    if m0:
+        month = int(m0.group(1))
+        year = _normalize_year(int(m0.group(2)))
+        return m0.group(0).strip(), ParsedDate(
+            kind="DATE", month=month, year=year, form=DateForm.NUMERIC, label=label
+        )
 
     # 1. Numeric MM/YYYY or MM.YYYY or MM-YYYY
     numeric_pattern = re.compile(r"\b(0?[1-9]|1[0-2])\s*[/.\-]\s*((?:19|20)\d{2}|\d{2})\b")

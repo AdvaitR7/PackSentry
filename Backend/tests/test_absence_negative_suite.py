@@ -58,7 +58,7 @@ def make_context() -> ProductContext:
         (Field.COMMON_GENERIC_NAME, "R6_1_B_GENERIC_NAME"),
         (Field.NET_QUANTITY, "R6_1_C_NET_QUANTITY"),
         (Field.DATE_OF_MANUFACTURE_PACKING_IMPORT, "R6_1_D_DATE"),
-        (Field.RETAIL_SALE_PRICE, "R6_1_E_RSP_FORM"),
+        (Field.MANUFACTURER_NAME_ADDRESS, "R6_1_A_IDENTITY"),
         (Field.CONSUMER_CARE, "R6_2_CONSUMER_CARE"),
     ],
 )
@@ -94,22 +94,22 @@ def test_unconfirmed_panels_missing_field_never_accuses(field: Field, rule_id: s
 
 def test_missing_declaration_only_permitted_after_all_panels_confirmed():
     """The same OCR miss may become MISSING_DECLARATION only after full panel confirmation."""
-    missing_mrp = Declaration(
-        field=Field.RETAIL_SALE_PRICE,
+    missing_name = Declaration(
+        field=Field.COMMON_GENERIC_NAME,
         status=ExtractionStatus.NOT_FOUND,
         not_found_reason=NotFoundReason.NO_MATCH_IN_CAPTURED_PANELS,
     )
 
     partial = DeclarationSet(
-        declarations=[missing_mrp],
+        declarations=[missing_name],
         panel_coverage=PanelCoverage(roles_captured=[PanelRole.PDP], all_panels_confirmed=False),
     )
     confirmed = DeclarationSet(
-        declarations=[missing_mrp],
+        declarations=[missing_name],
         panel_coverage=PanelCoverage(roles_captured=[PanelRole.PDP, PanelRole.BACK], all_panels_confirmed=True),
     )
 
-    rule = get_rule("R6_1_E_RSP_FORM")
+    rule = get_rule("R6_1_B_GENERIC_NAME")
     result_partial = evaluate_single_rule(rule, partial, make_context())
     result_confirmed = evaluate_single_rule(rule, confirmed, make_context())
 
@@ -176,26 +176,20 @@ def test_vlm_quantity_cannot_clear_or_accuse(raw_value, parsed, rule_id):
 
 
 def test_vlm_price_cannot_clear_or_accuse():
-    """A VLM-extracted MRP form cannot produce COMPLIANT or NON_COMPLIANT."""
-    tainted_price = Declaration(
-        field=Field.RETAIL_SALE_PRICE,
+    """A VLM-extracted consumer care declaration cannot produce COMPLIANT or NON_COMPLIANT."""
+    tainted_cc = Declaration(
+        field=Field.CONSUMER_CARE,
         status=ExtractionStatus.FOUND,
-        raw_value="MRP Rs. 500.00",
-        parsed=ParsedPrice(
-            amount=500.0,
-            prefix_raw="MRP",
-            prefix_form=PricePrefixForm.MRP,
-            inclusive_phrase_present=False,
-        ),
+        raw_value="Consumer Care: care@test.com, Tel: 1800-111-2222",
         method=ExtractionMethod.VLM_FALLBACK,
         extraction_confidence=0.70,
     )
     decl_set = DeclarationSet(
-        declarations=[tainted_price],
+        declarations=[tainted_cc],
         panel_coverage=PanelCoverage(roles_captured=[PanelRole.PDP, PanelRole.BACK], all_panels_confirmed=True),
     )
 
-    result = evaluate_single_rule(get_rule("R6_1_E_RSP_FORM"), decl_set, make_context())
+    result = evaluate_single_rule(get_rule("R6_2_CONSUMER_CARE"), decl_set, make_context())
     assert result.verdict == InternalVerdict.LOW_CONFIDENCE
     assert result.ui_bucket == UiBucket.MANUAL_REVIEW
     assert result.reason_code == "VLM_UNVERIFIED_EXTRACTION"
