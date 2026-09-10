@@ -2,7 +2,7 @@
 OCR Router and Failover Orchestrator.
 
 Runs one OCR engine at a time for each panel in priority order:
-Gemini 3.6 Flash -> Qwen2.5-VL -> PaddleOCR -> Google Cloud Vision.
+9Router Antigravity -> Google AI Studio Gemini -> local/cloud fallbacks.
 """
 
 import logging
@@ -12,6 +12,7 @@ from lmpc_schema import ImageSlot, OcrDocument, PanelRole
 from app.preprocessing import ProcessedPanel
 from .cloud_vision import GoogleCloudVisionAdapter
 from .gemini_engine import GeminiFlashOcrAdapter
+from .ninerouter_engine import NineRouterOcrAdapter
 from .paddleocr_engine import PaddleOcrAdapter
 from .protocol import OcrEngine, OcrEngineError
 from .qwen_engine import QwenOcrAdapter
@@ -20,7 +21,7 @@ logger = logging.getLogger("packsentry.ocr.router")
 
 
 class OcrRouter:
-    """Runs Gemini first (if configured), then Qwen, then PaddleOCR, then Cloud Vision."""
+    """Runs configured OCR transports in priority order with sequential failover."""
 
     def __init__(
         self,
@@ -40,9 +41,14 @@ class OcrRouter:
         ):
             self.engines = [e for e in [primary, fallback, tertiary, quaternary] if e is not None]
         else:
+            ninerouter = NineRouterOcrAdapter()
             gemini = GeminiFlashOcrAdapter()
-            if gemini.api_key:
-                # Use Gemini exclusively when configured (internal fallback across Gemini 3 family); do NOT run PaddleOCR or Qwen
+            if ninerouter.base_url:
+                self.engines = [ninerouter]
+                if gemini.api_key:
+                    self.engines.append(gemini)
+            elif gemini.api_key:
+                # Google AI Studio retains its internal Gemini model fallback chain.
                 self.engines = [gemini]
             else:
                 self.engines = [

@@ -638,7 +638,10 @@ async def test_gemini_ocr_default_timeout_from_env():
 @pytest.mark.asyncio
 async def test_ocr_router_uses_only_gemini_when_key_set():
     """Verify router selects Gemini exclusively and does not initialize or run PaddleOCR/Qwen."""
-    with patch.dict("os.environ", {"GEMINI_API_KEY": "test_key_live"}):
+    with patch.dict(
+        "os.environ",
+        {"GEMINI_API_KEY": "test_key_live", "NINEROUTER_URL": ""},
+    ):
         router = OcrRouter()
         assert len(router.engines) == 1
         assert router.engines[0].engine_name == "gemini-3.6-flash"

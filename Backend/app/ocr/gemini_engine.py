@@ -372,8 +372,8 @@ class GeminiFlashOcrAdapter:
         text_parts = [p.get("text", "") for p in parts if "text" in p]
         return "\n".join(text_parts).strip()
 
+    @staticmethod
     def _parse_response(
-        self,
         raw_response: str,
         role: PanelRole,
         image_id: str,
