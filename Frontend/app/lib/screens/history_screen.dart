@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../models/models.dart';
 import '../services/api_service.dart';
+import '../theme/app_theme.dart';
 import 'processing_screen.dart';
 import 'results_screen.dart';
 
@@ -80,12 +81,12 @@ class _HistoryScreenState extends State<HistoryScreen> {
   }
 
   Color _statusColor(String status, String? bucket) {
-    if (status == 'FAILED') return Colors.red;
-    if (status != 'COMPLETE') return Colors.blue;
-    if (bucket == 'POTENTIAL_NON_COMPLIANCE') return Colors.red;
-    if (bucket == 'MANUAL_REVIEW') return Colors.orange;
-    if (bucket == 'INSUFFICIENT_EVIDENCE') return Colors.amber.shade800;
-    return Colors.green;
+    if (status == 'FAILED') return AppColors.violation;
+    if (status != 'COMPLETE') return AppColors.primary;
+    if (bucket == 'POTENTIAL_NON_COMPLIANCE') return AppColors.violation;
+    if (bucket == 'MANUAL_REVIEW') return AppColors.review;
+    if (bucket == 'INSUFFICIENT_EVIDENCE') return AppColors.insufficient;
+    return AppColors.compliant;
   }
 
   @override

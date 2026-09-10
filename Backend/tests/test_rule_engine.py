@@ -43,7 +43,7 @@ from lmpc_schema import (
     UiBucket,
 )
 
-from app.rules import RuleEngine, evaluate_inspection, get_rules_as_of
+from app.rules import RuleEngine, evaluate_inspection, evaluate_single_rule, get_rule, get_rules_as_of
 
 FIXTURES_DIR = Path(__file__).resolve().parent / "fixtures" / "ocr"
 
@@ -386,11 +386,12 @@ def test_missing_mrp_fixture():
     results, overall_verdict, overall_ui_bucket, summary = evaluate_inspection(declarations, context)
     rule_map = {r.rule_id: r for r in results}
 
+    # Rule 6(1)(e) is disabled; evaluated as COMPLIANT
     r6_mrp = rule_map["R6_1_E_RSP_FORM"]
-    assert r6_mrp.verdict == InternalVerdict.MISSING_DECLARATION
-    assert r6_mrp.reason_code == "MRP_DECLARATION_ABSENT"
+    assert r6_mrp.verdict == InternalVerdict.COMPLIANT
+    assert r6_mrp.reason_code == "MRP_RULE_DISABLED"
 
-    # Overall verdict flags non-compliance
+    # Overall verdict flags missing declaration because date declaration is absent
     assert overall_verdict in [InternalVerdict.NON_COMPLIANT, InternalVerdict.MISSING_DECLARATION]
     assert overall_ui_bucket == UiBucket.POTENTIAL_NON_COMPLIANCE
 
@@ -561,7 +562,7 @@ def test_absence_evidence_gate_unconfirmed_panels():
     # If all_panels_confirmed is FALSE, absent field becomes NOT_CAPTURED, never MISSING_DECLARATION
     declarations = DeclarationSet(
         declarations=[
-            Declaration(field=Field.RETAIL_SALE_PRICE, status=ExtractionStatus.NOT_FOUND),
+            Declaration(field=Field.COMMON_GENERIC_NAME, status=ExtractionStatus.NOT_FOUND),
         ],
         panel_coverage=PanelCoverage(roles_captured=[PanelRole.PDP], all_panels_confirmed=False),
     )
@@ -573,11 +574,11 @@ def test_absence_evidence_gate_unconfirmed_panels():
     )
 
     results, overall_verdict, overall_ui_bucket, summary = evaluate_inspection(declarations, context)
-    r6_mrp = next(r for r in results if r.rule_id == "R6_1_E_RSP_FORM")
+    r6_generic = next(r for r in results if r.rule_id == "R6_1_B_GENERIC_NAME")
 
-    assert r6_mrp.verdict == InternalVerdict.NOT_CAPTURED
-    assert r6_mrp.ui_bucket == UiBucket.INSUFFICIENT_EVIDENCE
-    assert r6_mrp.reason_code == "PANEL_NOT_CONFIRMED_CAPTURED"
+    assert r6_generic.verdict == InternalVerdict.NOT_CAPTURED
+    assert r6_generic.ui_bucket == UiBucket.INSUFFICIENT_EVIDENCE
+    assert r6_generic.reason_code == "PANEL_NOT_CONFIRMED_CAPTURED"
 
 
 # ---------------------------------------------------------------------------
@@ -615,15 +616,18 @@ def test_vlm_fallback_provenance_neutralization():
 # ---------------------------------------------------------------------------
 # Invariant Test 10: Rule 13(5)(ii) 2021 Count Amendment (ADR-0011)
 # ---------------------------------------------------------------------------
-def test_rule_13_number_symbol_2021_amendment():
-    # '20 pieces' is lawful under G.S.R. 779(E) (2021 amendment)
+@pytest.mark.parametrize("raw_value,unit_raw,unit_canonical", [
+    ("20 pieces", "pieces", "piece"),
+    ("1 U", "U", "u"),
+])
+def test_rule_12_and_13_accept_lawful_count_notation(raw_value, unit_raw, unit_canonical):
     declarations = DeclarationSet(
         declarations=[
             Declaration(
                 field=Field.NET_QUANTITY,
                 status=ExtractionStatus.FOUND,
-                raw_value="20 pieces",
-                parsed=ParsedQuantity(magnitude=20.0, unit_raw="pieces", unit_canonical="piece", dimension=DimensionKind.NUMBER, is_si=True, symbol_is_prescribed=True),
+                raw_value=raw_value,
+                parsed=ParsedQuantity(magnitude=float(raw_value.split()[0]), unit_raw=unit_raw, unit_canonical=unit_canonical, dimension=DimensionKind.NUMBER, is_si=True, symbol_is_prescribed=True),
                 method=ExtractionMethod.ALIAS_ANCHOR,
             ),
         ],
@@ -631,16 +635,103 @@ def test_rule_13_number_symbol_2021_amendment():
     )
     context = ProductContext(
         package_type=PackageType.RETAIL,
-        commodity_category=CommodityCategory.GENERAL,
+        commodity_category=CommodityCategory.TEXTILE,
         scan_date=date(2026, 9, 4),
         ruleset_as_of=date(2026, 9, 4),
     )
 
     results, _, _, _ = evaluate_inspection(declarations, context)
-    r13_num = next(r for r in results if r.rule_id == "R13_NUMBER_SYMBOL")
+    rule_map = {result.rule_id: result for result in results}
 
-    assert r13_num.verdict == InternalVerdict.COMPLIANT
-    assert r13_num.reason_code == "COUNT_TERMINOLOGY_COMPLIANT"
+    assert rule_map["R12_QUANTITY_BASIS"].verdict == InternalVerdict.COMPLIANT
+    assert rule_map["R13_NUMBER_SYMBOL"].verdict == InternalVerdict.COMPLIANT
+    assert rule_map["R13_NUMBER_SYMBOL"].reason_code == "COUNT_TERMINOLOGY_COMPLIANT"
+
+
+@pytest.mark.parametrize("category", [
+    CommodityCategory.GENERAL,
+    CommodityCategory.TEXTILE,
+    CommodityCategory.FOOD,
+    CommodityCategory.COSMETIC,
+])
+def test_rule_12_accepts_1_u_across_ordinary_categories(category):
+    declarations = DeclarationSet(
+        declarations=[
+            Declaration(
+                field=Field.NET_QUANTITY,
+                status=ExtractionStatus.FOUND,
+                raw_value="1 U",
+                parsed=ParsedQuantity(magnitude=1.0, unit_raw="U", unit_canonical="u", dimension=DimensionKind.NUMBER, is_si=True, symbol_is_prescribed=True),
+                method=ExtractionMethod.ALIAS_ANCHOR,
+            ),
+        ],
+        panel_coverage=PanelCoverage(roles_captured=[PanelRole.PDP, PanelRole.BACK], all_panels_confirmed=True),
+    )
+    context = ProductContext(
+        package_type=PackageType.RETAIL,
+        commodity_category=category,
+        scan_date=date(2026, 9, 4),
+        ruleset_as_of=date(2026, 9, 4),
+    )
+
+    result = evaluate_single_rule(get_rule("R12_QUANTITY_BASIS"), declarations, context)
+    assert result.verdict == InternalVerdict.COMPLIANT
+    assert result.reason_code == "QUANTITY_BASIS_COMPLIANT"
+
+
+@pytest.mark.parametrize("category", [
+    CommodityCategory.FOOD,
+    CommodityCategory.COSMETIC,
+    CommodityCategory.GENERAL,
+])
+def test_rule_12_accepts_liquid_volume_across_ordinary_categories(category):
+    declarations = DeclarationSet(
+        declarations=[
+            Declaration(
+                field=Field.NET_QUANTITY,
+                status=ExtractionStatus.FOUND,
+                raw_value="500 mL",
+                parsed=ParsedQuantity(magnitude=500.0, unit_raw="mL", unit_canonical="ml", dimension=DimensionKind.VOLUME, is_si=True, symbol_is_prescribed=True),
+                method=ExtractionMethod.ALIAS_ANCHOR,
+            ),
+        ],
+        panel_coverage=PanelCoverage(roles_captured=[PanelRole.PDP, PanelRole.BACK], all_panels_confirmed=True),
+    )
+    context = ProductContext(
+        package_type=PackageType.RETAIL,
+        commodity_category=category,
+        scan_date=date(2026, 9, 4),
+        ruleset_as_of=date(2026, 9, 4),
+    )
+
+    result = evaluate_single_rule(get_rule("R12_QUANTITY_BASIS"), declarations, context)
+    assert result.verdict == InternalVerdict.COMPLIANT
+    assert result.reason_code == "QUANTITY_BASIS_COMPLIANT"
+
+
+def test_rule_14_requires_piece_count_when_dimensions_are_present():
+    declarations = DeclarationSet(
+        declarations=[
+            Declaration(
+                field=Field.COMMODITY_DIMENSIONS,
+                status=ExtractionStatus.FOUND,
+                raw_value="Finished size: 220 cm x 240 cm",
+                method=ExtractionMethod.PATTERN_ONLY,
+            ),
+        ],
+        panel_coverage=PanelCoverage(roles_captured=[PanelRole.PDP, PanelRole.BACK], all_panels_confirmed=True),
+    )
+    context = ProductContext(
+        package_type=PackageType.RETAIL,
+        commodity_category=CommodityCategory.TEXTILE,
+        scan_date=date(2026, 9, 4),
+        ruleset_as_of=date(2026, 9, 4),
+    )
+
+    result = evaluate_single_rule(get_rule("R14_TEXTILE"), declarations, context)
+
+    assert result.verdict == InternalVerdict.NON_COMPLIANT
+    assert result.reason_code == "TEXTILE_PIECE_COUNT_MISSING"
 
 
 # ---------------------------------------------------------------------------

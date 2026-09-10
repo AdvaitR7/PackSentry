@@ -230,8 +230,12 @@ def evaluate_r13_number_symbol(declarations: DeclarationSet, context: ProductCon
         )
 
     # If sold by number, verify it mentions one of the 2021 amended statutory terms
-    has_lawful_term = any(
-        re.search(rf"\b{re.escape(term)}\b", lower_raw) for term in _LAWFUL_COUNT_TERMS
+    has_lawful_term = (
+        (isinstance(parsed, ParsedQuantity) and parsed.unit_canonical in _LAWFUL_COUNT_TERMS)
+        or any(
+            re.search(rf"(?:^|\b|\d){re.escape(term)}(?:\b|$|\d)", lower_raw)
+            for term in _LAWFUL_COUNT_TERMS
+        )
     )
 
     if not has_lawful_term:

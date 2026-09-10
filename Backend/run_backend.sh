@@ -26,4 +26,8 @@ echo "API live on http://$HOST:$PORT (docs: /docs, health: /healthz)"
 echo "========================================================"
 
 export PYTHONPATH="..:.:$PYTHONPATH"
-exec "$PY_BIN" -m uvicorn app.main:app --host "$HOST" --port "$PORT" --reload
+ENV_FILE_ARGS=()
+if [ -f ".env" ]; then
+    ENV_FILE_ARGS=(--env-file .env)
+fi
+exec "$PY_BIN" -m uvicorn app.main:app --host "$HOST" --port "$PORT" --reload "${ENV_FILE_ARGS[@]}"

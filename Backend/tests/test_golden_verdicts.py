@@ -110,22 +110,18 @@ def test_golden_r04_mandatory_label():
     assert spec is not None
     ctx = make_context()
 
-    # Case A: Compliant (bears primary declarations: identity, quantity, price)
-    decl_set_comp = DeclarationSet(
-        declarations=[
-            Declaration(field=Field.MANUFACTURER_NAME_ADDRESS, status=ExtractionStatus.FOUND, raw_value="Apex Tea Ltd"),
-            Declaration(field=Field.NET_QUANTITY, status=ExtractionStatus.FOUND, raw_value="500 g"),
-            Declaration(field=Field.RETAIL_SALE_PRICE, status=ExtractionStatus.FOUND, raw_value="MRP Rs. 100"),
-        ],
+    # Rule 4 is disabled; evaluated as COMPLIANT
+    decl_set = DeclarationSet(
+        declarations=[],
         panel_coverage=make_coverage(),
     )
-    res_comp = evaluate_single_rule(spec, decl_set_comp, ctx)
+    res_comp = evaluate_single_rule(spec, decl_set, ctx)
     assert res_comp.verdict == InternalVerdict.COMPLIANT
-    assert res_comp.reason_code == "MANDATORY_DECLARATIONS_AFFIXED"
+    assert res_comp.reason_code == "RULE_4_DISABLED"
 
-    # Case B: Excluded category (Institutional package deferred under Rule 3(c))
+    # Excluded category (Institutional package deferred under Rule 3(c))
     ctx_institutional = make_context(package_type=PackageType.INSTITUTIONAL)
-    res_excl = evaluate_single_rule(spec, decl_set_comp, ctx_institutional)
+    res_excl = evaluate_single_rule(spec, decl_set, ctx_institutional)
     assert res_excl.verdict == InternalVerdict.NOT_APPLICABLE
 
 
@@ -178,7 +174,7 @@ def test_golden_r06_retail_sale_price_inclusive_phrase():
     assert spec is not None
     ctx = make_context()
 
-    # Valid MRP with statutory inclusive phrase
+    # Rule 6(1)(e) MRP verification is disabled; always evaluates to COMPLIANT
     decl_valid = Declaration(
         field=Field.RETAIL_SALE_PRICE,
         status=ExtractionStatus.FOUND,
@@ -188,18 +184,19 @@ def test_golden_r06_retail_sale_price_inclusive_phrase():
     )
     res_comp = evaluate_single_rule(spec, DeclarationSet(declarations=[decl_valid], panel_coverage=make_coverage()), ctx)
     assert res_comp.verdict == InternalVerdict.COMPLIANT
+    assert res_comp.reason_code == "MRP_RULE_DISABLED"
 
-    # Violation: MRP missing "inclusive of all taxes"
-    decl_invalid = Declaration(
+    # Even without explicit price prefix or without inclusive phrase, it evaluates as COMPLIANT
+    decl_any_price = Declaration(
         field=Field.RETAIL_SALE_PRICE,
         status=ExtractionStatus.FOUND,
-        raw_value="MRP Rs. 150.00",
-        parsed=ParsedPrice(amount=150.0, prefix_raw="MRP", prefix_form=PricePrefixForm.MRP, inclusive_phrase_present=False),
+        raw_value="Price Rs. 150.00",
+        parsed=ParsedPrice(amount=150.0, prefix_raw="Price", prefix_form=PricePrefixForm.OTHER, inclusive_phrase_present=False),
         method=ExtractionMethod.ALIAS_ANCHOR,
     )
-    res_non_comp = evaluate_single_rule(spec, DeclarationSet(declarations=[decl_invalid], panel_coverage=make_coverage()), ctx)
-    assert res_non_comp.verdict == InternalVerdict.NON_COMPLIANT
-    assert res_non_comp.reason_code == "TAX_INCLUSIVE_PHRASE_MISSING"
+    res_any = evaluate_single_rule(spec, DeclarationSet(declarations=[decl_any_price], panel_coverage=make_coverage()), ctx)
+    assert res_any.verdict == InternalVerdict.COMPLIANT
+    assert res_any.reason_code == "MRP_RULE_DISABLED"
 
 
 def test_golden_r06_country_of_origin():

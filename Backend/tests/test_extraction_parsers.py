@@ -100,6 +100,16 @@ def test_parse_quantity_multi_unit():
     assert parsed.magnitude == 400.0
 
 
+@pytest.mark.parametrize("text", ["1 U", "1U", "1 unit", "1 Unit"])
+def test_parse_quantity_number_variants(text):
+    result = parse_quantity(text)
+    assert result is not None
+    _, parsed = result
+    assert parsed.magnitude == 1.0
+    assert parsed.dimension == DimensionKind.NUMBER
+    assert parsed.symbol_is_prescribed is True
+
+
 def test_parse_quantity_number_pieces():
     result = parse_quantity("20 pieces")
     assert result is not None
@@ -144,6 +154,24 @@ def test_parse_price_no_inclusive_phrase():
     assert result is not None
     _, parsed = result
     assert parsed.inclusive_phrase_present is False
+
+
+@pytest.mark.parametrize("text", [
+    "M.R.P. Rs. 250.00",
+    "M.R.P. 250",
+    "M.R.P 250",
+    "M. R. P. 250",
+    "M. R. P. Rs. 250",
+    "M.R.P.: 250",
+    "M.R.P.: ₹250",
+    "M R P 250",
+])
+def test_parse_price_mrp_with_dots_and_spaces(text):
+    result = parse_price(text)
+    assert result is not None
+    _, parsed = result
+    assert parsed.amount == 250.0
+    assert parsed.prefix_form == PricePrefixForm.MRP
 
 
 # ---------- D3: Date Parser ----------
@@ -192,7 +220,38 @@ def test_parse_date_imported():
     assert parsed.label == DateLabel.IMPORTED
 
 
+@pytest.mark.parametrize("expiry_line", [
+    "EXP: 07/2027",
+    "EXPIRY: 12/2028",
+    "Use By: 08/2027",
+    "Best Before: 05/2028",
+])
+def test_parse_date_excludes_standalone_expiry_and_use_by(expiry_line):
+    assert parse_date(expiry_line) is None
+
+
+def test_parse_date_joint_mfd_and_exp():
+    result = parse_date("MFD: 07/2025, EXP: 07/2026")
+    assert result is not None
+    _, parsed = result
+    assert parsed.month == 7
+    assert parsed.year == 2025
+    assert parsed.label == DateLabel.MFG
+
+
 # ---------- D4: Address & Consumer Care ----------
+
+@pytest.mark.parametrize("text,expected_pin", [
+    ("CleanHome Chemicals Ltd, 42 Industrial Area, Vapi, Gujarat 396195", "396195"),
+    ("Mkt. by: Marico Ltd., Kalinga, Santacruz (East), Mumbai-400 098, MH.", "400098"),
+    ("SIPCT Industrial Growth Center, Perundurai-638 052, TN.", "638052"),
+])
+def test_parse_address_block_pin_formats(text, expected_pin):
+    result = parse_address_block([text])
+    assert result is not None
+    _, parsed = result
+    assert parsed.pin_code == expected_pin
+
 
 def test_parse_address_complete():
     lines = ["MANUFACTURED BY: CleanHome Chemicals Ltd, 42 Industrial Area, Vapi, Gujarat 396195"]

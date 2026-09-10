@@ -23,9 +23,11 @@ from app.rules import evaluate_inspection
 from lmpc_schema import (
     CaptureContext,
     CommodityCategory,
+    ExtractionStatus,
     Field,
     ImportStatus,
     InternalVerdict,
+    NotFoundReason,
     OcrDocument,
     PackageType,
     PanelRole,
@@ -148,10 +150,14 @@ def test_full_pipeline_absence_gate_neutralization():
         ruleset_as_of=date(2026, 9, 7),
     )
 
+    # Verify declaration level not_found_reason
+    mrp_decl = next(d for d in decl_set.declarations if d.field == Field.RETAIL_SALE_PRICE)
+    assert mrp_decl.status == ExtractionStatus.NOT_FOUND
+    assert mrp_decl.not_found_reason == NotFoundReason.PANEL_NOT_CAPTURED
+
     rule_results, overall_verdict, overall_ui_bucket, summary = evaluate_inspection(decl_set, prod_ctx)
 
     r6_mrp = next(r for r in rule_results if r.rule_id == "R6_1_E_RSP_FORM")
-    # Invariant: Must NOT accuse as MISSING_DECLARATION
-    assert r6_mrp.verdict == InternalVerdict.NOT_CAPTURED
-    assert r6_mrp.ui_bucket == UiBucket.INSUFFICIENT_EVIDENCE
+    # Rule 6(1)(e) is disabled; evaluated as COMPLIANT without accusing
+    assert r6_mrp.verdict == InternalVerdict.COMPLIANT
     assert summary.potential_non_compliance == 0

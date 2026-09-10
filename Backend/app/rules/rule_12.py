@@ -26,16 +26,46 @@ from .spec import RuleOutcome, RuleSpec
 _FOURTH_SCHEDULE_PATH = Path(__file__).resolve().parent.parent / "data" / "fourth_schedule.yaml"
 
 # Rule 12(2) ordinary basis mapping (used when no Fourth Schedule override applies)
-_ORDINARY_CATEGORY_BASIS: Dict[CommodityCategory, DimensionKind] = {
-    CommodityCategory.TEXTILE: DimensionKind.NUMBER,
-    CommodityCategory.SHEET_PRODUCT: DimensionKind.NUMBER,
-    CommodityCategory.CONTAINER_TYPE: DimensionKind.NUMBER,
-    CommodityCategory.FOOD: DimensionKind.MASS,
-    CommodityCategory.COSMETIC: DimensionKind.MASS,
-    CommodityCategory.ALCOHOL: DimensionKind.VOLUME,
-    CommodityCategory.SEEDS: DimensionKind.MASS,
-    CommodityCategory.CEMENT_FERTILIZER_AGRI: DimensionKind.MASS,
-    CommodityCategory.GENERAL: DimensionKind.MASS,
+# Under Rule 12(2), permitted basis depends on physical state and commodity type:
+# - solids/semi-solids -> MASS
+# - liquids -> VOLUME
+# - items sold by number -> NUMBER
+# - items sold by linear/area measure -> LENGTH / AREA
+_ORDINARY_CATEGORY_BASIS: Dict[CommodityCategory, List[DimensionKind]] = {
+    CommodityCategory.GENERAL: [
+        DimensionKind.MASS,
+        DimensionKind.VOLUME,
+        DimensionKind.NUMBER,
+        DimensionKind.LENGTH,
+        DimensionKind.AREA,
+    ],
+    CommodityCategory.FOOD: [
+        DimensionKind.MASS,
+        DimensionKind.VOLUME,
+        DimensionKind.NUMBER,
+    ],
+    CommodityCategory.COSMETIC: [
+        DimensionKind.MASS,
+        DimensionKind.VOLUME,
+        DimensionKind.NUMBER,
+    ],
+    CommodityCategory.TEXTILE: [
+        DimensionKind.NUMBER,
+        DimensionKind.LENGTH,
+        DimensionKind.MASS,
+    ],
+    CommodityCategory.SHEET_PRODUCT: [
+        DimensionKind.NUMBER,
+        DimensionKind.AREA,
+        DimensionKind.LENGTH,
+    ],
+    CommodityCategory.CONTAINER_TYPE: [
+        DimensionKind.NUMBER,
+        DimensionKind.VOLUME,
+    ],
+    CommodityCategory.ALCOHOL: [DimensionKind.VOLUME],
+    CommodityCategory.SEEDS: [DimensionKind.MASS, DimensionKind.NUMBER],
+    CommodityCategory.CEMENT_FERTILIZER_AGRI: [DimensionKind.MASS],
 }
 
 _MISLEADING_KEYWORDS = ["minimum", "not less than", "average", "about", "approximately"]
@@ -79,8 +109,11 @@ def evaluate_r12_quantity_basis(declarations: DeclarationSet, context: ProductCo
     permitted = _permitted_bases(context)
     if permitted is None:
         # Fall through to Rule 12(2) ordinary mapping
-        expected_basis = _ORDINARY_CATEGORY_BASIS.get(context.commodity_category)
-        permitted = [expected_basis.value] if expected_basis else None
+        expected_bases = _ORDINARY_CATEGORY_BASIS.get(
+            context.commodity_category,
+            [DimensionKind.MASS, DimensionKind.VOLUME, DimensionKind.NUMBER],
+        )
+        permitted = [b.value for b in expected_bases]
 
     if isinstance(parsed, ParsedQuantity) and permitted:
         declared_basis = parsed.dimension.value

@@ -63,6 +63,17 @@ def evaluate_r14_textile(declarations: DeclarationSet, context: ProductContext) 
             methods_used=methods,
         )
 
+    if not has_count:
+        return RuleOutcome(
+            verdict=InternalVerdict.NON_COMPLIANT,
+            reason_code="TEXTILE_PIECE_COUNT_MISSING",
+            message="Textile product declares finished dimensions but omits piece count required by Rule 14.",
+            observed=raw_text_of(decl_entries) or raw_text_of(decl_dim),
+            expected="Number of pieces",
+            evidence=_merge_evidence(decl_dim, decl_entries),
+            methods_used=methods,
+        )
+
     return RuleOutcome(
         verdict=InternalVerdict.COMPLIANT,
         reason_code="TEXTILE_DECLARATIONS_COMPLIANT",

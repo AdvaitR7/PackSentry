@@ -10,10 +10,13 @@ Handles:
 """
 
 from dataclasses import dataclass
+import os
 from typing import List, Optional, Tuple
 import cv2 as cv
 import numpy as np
 from lmpc_schema import Transform
+
+DEFAULT_MAX_ANALYSIS_EDGE = int(os.environ.get("MAX_ANALYSIS_EDGE", "2048"))
 
 
 @dataclass
@@ -114,7 +117,7 @@ class ImagePreprocessor:
     @staticmethod
     def preprocess_panel(
         raw_bytes: bytes,
-        max_edge: int = 1600,
+        max_edge: int = DEFAULT_MAX_ANALYSIS_EDGE,
         jpeg_quality: int = 85,
     ) -> Optional[ProcessedPanel]:
         """

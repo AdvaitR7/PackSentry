@@ -159,8 +159,7 @@ def evaluate_single_rule(
             )
 
     # 5. Provenance Taint Neutralization Gate (ADR-0004 & ADR-0005)
-    # Any field extracted by VLM_FALLBACK carries immutable provenance taint.
-    # It cannot emit COMPLIANT, NON_COMPLIANT, or MISSING_DECLARATION.
+    # Generative fallback evidence can assist review but cannot accuse or clear.
     if ExtractionMethod.VLM_FALLBACK in outcome.methods_used:
         verdict = InternalVerdict.LOW_CONFIDENCE
         reason_code = "VLM_UNVERIFIED_EXTRACTION"

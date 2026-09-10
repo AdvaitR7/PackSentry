@@ -17,7 +17,7 @@ import re
 from typing import List, Optional, Tuple
 from lmpc_schema import AddressRoleMarker, ParsedAddress
 
-PIN_CODE_PATTERN = re.compile(r"\b([1-9][0-9]{5})\b")
+PIN_CODE_PATTERN = re.compile(r"\b([1-9][0-9]{2}\s?[0-9]{3})\b")
 EMAIL_PATTERN = re.compile(r"\b[A-Za-z0-9._%+\-]+@[A-Za-z0-9.\-]+\.[A-Za-z]{2,}\b")
 PHONE_PATTERN = re.compile(r"(?:tel|phone|toll\s*free|call|contact|ph)?[:.\s\-]*(\+?91[\s\-]?)?(?:\d{3,5}[\s\-]?\d{6,8}|\d{10,11}|1800[\s\-]?\d{3}[\s\-]?\d{3,4})", re.IGNORECASE)
 
@@ -29,12 +29,14 @@ INDIAN_STATES = {
     "telangana", "tripura", "uttar pradesh", "uttarakhand", "west bengal",
     "delhi", "jammu & kashmir", "jammu and kashmir", "ladakh", "puducherry",
     "chandigarh", "daman & diu", "dadra & nagar haveli",
+    "mh", "tn", "ka", "dl", "gj", "up", "wb", "mp", "ap", "ts", "hr", "pb", "rj", "kl",
 }
 
 STREET_KEYWORDS = {
     "street", "road", "marg", "lane", "rasta", "sector", "nagar", "area",
-    "estate", "industrial area", "midc", "gidc", "sidco", "riico", "phase",
-    "highway", "avenue", "path", "gali", "bazaar", "colony", "enclave", "park",
+    "estate", "industrial area", "midc", "gidc", "sidco", "riico", "sipcot",
+    "growth center", "growth centre", "phase", "highway", "avenue", "path",
+    "gali", "bazaar", "colony", "enclave", "park", "zone",
 }
 
 PREMISES_PATTERNS = [
@@ -47,7 +49,7 @@ PREMISES_PATTERNS = [
 ROLE_MARKER_MAP = [
     (re.compile(r"\bmanufactured\s+by\b|\bmfd\.?\s+by\b", re.IGNORECASE), AddressRoleMarker.MANUFACTURED_BY),
     (re.compile(r"\bpacked\s+by\b|\bpkd\.?\s+by\b", re.IGNORECASE), AddressRoleMarker.PACKED_BY),
-    (re.compile(r"\bmarketed\s+by\b|\bmkd\.?\s+by\b", re.IGNORECASE), AddressRoleMarker.MARKETED_BY),
+    (re.compile(r"\bmarketed\s+by\b|\bmk[td]\.?\s+by\b|\bmktg?\.?\s+by\b", re.IGNORECASE), AddressRoleMarker.MARKETED_BY),
     (re.compile(r"\bimported\s+by\b|\bimp\.?\s+by\b", re.IGNORECASE), AddressRoleMarker.IMPORTED_BY),
 ]
 
@@ -74,7 +76,7 @@ def parse_address_block(lines: List[str]) -> Optional[Tuple[str, ParsedAddress]]
 
     # Detect PIN code
     pin_match = PIN_CODE_PATTERN.search(full_text)
-    pin_code = pin_match.group(1) if pin_match else None
+    pin_code = pin_match.group(1).replace(" ", "") if pin_match else None
 
     # Detect premises number
     has_premises = False
@@ -114,17 +116,22 @@ def parse_address_block(lines: List[str]) -> Optional[Tuple[str, ParsedAddress]]
 
 def parse_consumer_care(raw_line: str) -> Optional[Tuple[str, str]]:
     """
-    Extracts consumer care details from a line (telephone, email, address).
+    Extracts consumer care details from a line (telephone, email, address, helpline).
     Returns (raw_value, description) if matched, else None.
     """
     if not raw_line:
         return None
 
+    lower = raw_line.lower()
     has_email = EMAIL_PATTERN.search(raw_line) is not None
     has_phone = PHONE_PATTERN.search(raw_line) is not None
-    has_keyword = re.search(r"consumer\s+care|customer\s+care|helpline|care@", raw_line, re.IGNORECASE) is not None
+    has_keyword = any(kw in lower for kw in [
+        "consumer", "customer", "helpline", "care", "toll free", "feedback",
+        "complaint", "queries", "contact", "grievance", "call us", "write to",
+        "reach us", "support@"
+    ])
 
-    if has_keyword or (has_email and has_phone):
+    if has_keyword or has_email or has_phone:
         return raw_line.strip(), raw_line.strip()
 
     return None

@@ -22,6 +22,7 @@ from dataclasses import dataclass
 from datetime import date, datetime, timezone
 import json
 import logging
+import os
 from typing import Any, Dict, List, Optional
 from lmpc_schema import (
     CaptureContext,
@@ -234,7 +235,8 @@ class InspectionWorker:
             with open(raw_path, "rb") as f_in:
                 raw_bytes = f_in.read()
 
-            processed = ImagePreprocessor.preprocess_panel(raw_bytes, max_edge=1600)
+            max_edge = int(os.environ.get("MAX_ANALYSIS_EDGE", "2048"))
+            processed = ImagePreprocessor.preprocess_panel(raw_bytes, max_edge=max_edge)
             if processed is None:
                 raise ValueError(f"Failed to preprocess panel {role.value}")
 
@@ -312,9 +314,14 @@ class InspectionWorker:
         norm_doc = build_normalised_document(ocr_doc)
         declaration_set = extract_declarations(norm_doc, ocr_doc, capture_ctx)
 
-        # Selective VLM Fallback (D7) only when Qwen did not serve as primary OCR
-        # so primary Qwen OCR remains authoritative without unnecessary re-inference.
-        if "qwen2.5vl" not in engines_used and await self.vlm_interpreter.is_reachable():
+        # Selective VLM Fallback (D7) only when neither Gemini transport nor Qwen served as primary OCR
+        # so Gemini / Qwen primary OCR remains authoritative without unnecessary re-inference.
+        if (
+            "9router-antigravity" not in engines_used
+            and "gemini-3.6-flash" not in engines_used
+            and "qwen2.5vl" not in engines_used
+            and await self.vlm_interpreter.is_reachable()
+        ):
             critical_fields = [Field.NET_QUANTITY, Field.RETAIL_SALE_PRICE]
             for crit_field in critical_fields:
                 existing_decl = next((d for d in declaration_set.declarations if d.field == crit_field), None)
